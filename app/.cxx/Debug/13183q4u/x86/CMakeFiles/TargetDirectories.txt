@@ -1,0 +1,3 @@
+D:/AndroidStudioProjects/NotificationArchiver22/app/.cxx/Debug/13183q4u/x86/CMakeFiles/notificationarchiver.dir
+D:/AndroidStudioProjects/NotificationArchiver22/app/.cxx/Debug/13183q4u/x86/CMakeFiles/edit_cache.dir
+D:/AndroidStudioProjects/NotificationArchiver22/app/.cxx/Debug/13183q4u/x86/CMakeFiles/rebuild_cache.dir

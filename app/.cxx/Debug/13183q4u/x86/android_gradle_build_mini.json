@@ -1,0 +1,27 @@
+{
+  "buildFiles": [
+    "D:\\AndroidStudioProjects\\NotificationArchiver22\\app\\src\\main\\cpp\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "D:\\AndroidStudioSDK\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "D:\\AndroidStudioProjects\\NotificationArchiver22\\app\\.cxx\\Debug\\13183q4u\\x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "D:\\AndroidStudioSDK\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "D:\\AndroidStudioProjects\\NotificationArchiver22\\app\\.cxx\\Debug\\13183q4u\\x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "notificationarchiver::@6890427a1f51a3e7e1df": {
+      "artifactName": "notificationarchiver",
+      "abi": "x86",
+      "output": "D:\\AndroidStudioProjects\\NotificationArchiver22\\app\\build\\intermediates\\cxx\\Debug\\13183q4u\\obj\\x86\\libnotificationarchiver.so",
+      "runtimeFiles": []
+    }
+  }
+}
