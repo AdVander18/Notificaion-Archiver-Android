@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_marginTop="?attr/actionBarSize">
+
+    <Switch
+        android:id="@+id/switchDisableDuplicateNotifications"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:text="Не сохранять обновления уведомлений" />
+
+    <!-- Раздел Статистика -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Статистика"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- Памяти занимают уведомления -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Памяти занимают уведомления" />
+
+        <TextView
+            android:id="@+id/tvNotificationsMemory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Пока 0" />
+    </LinearLayout>
+
+    <!-- Памяти занимают изображения -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Памяти занимают изображения" />
+
+        <TextView
+            android:id="@+id/tvImagesMemory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Пока 0" />
+    </LinearLayout>
+
+    <!-- Пришло уведомлений за всё время -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Пришло уведомлений за всё время" />
+
+        <TextView
+            android:id="@+id/tvTotalNotifications"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Пока 0" />
+    </LinearLayout>
+
+    <!-- Пришло уведомлений за последние 24 часа -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Пришло уведомлений за последние 24 часа" />
+
+        <TextView
+            android:id="@+id/tvNotifications24h"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Пока 0" />
+    </LinearLayout>
+
+</LinearLayout>
