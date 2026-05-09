@@ -6,33 +6,44 @@ import android.graphics.drawable.Drawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.RecyclerView
 import java.text.SimpleDateFormat
 import java.util.*
 
 class PackageSummaryAdapter(
-    context: Context,
-    resource: Int,
-    items: List<NotificationDatabaseHelper.PackageSummary>
-) : ArrayAdapter<NotificationDatabaseHelper.PackageSummary>(context, resource, items.toMutableList()) {
+    private val context: Context,
+    private val layoutResId: Int,
+    private var items: List<NotificationDatabaseHelper.PackageSummary>,
+    private val onItemClick: ((NotificationDatabaseHelper.PackageSummary) -> Unit)? = null,
+    private val onItemLongClick: ((NotificationDatabaseHelper.PackageSummary) -> Boolean)? = null
+) : RecyclerView.Adapter<PackageSummaryAdapter.ViewHolder>() {
 
     private val iconCache = mutableMapOf<String, Drawable?>()
     private val defaultIcon: Drawable = context.resources.getDrawable(android.R.drawable.sym_def_app_icon, null)
     private val dateFormat = SimpleDateFormat("dd.MM.yy HH:mm", Locale.getDefault())
 
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val view = convertView ?: LayoutInflater.from(context)
-            .inflate(R.layout.item_app_summary, parent, false)
+    inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val appIcon: ImageView = itemView.findViewById(R.id.appIcon)
+        val appNameText: TextView = itemView.findViewById(R.id.appName)
+        val countText: TextView = itemView.findViewById(R.id.notificationCount)
+        val timeText: TextView = itemView.findViewById(R.id.latestTime)
+    }
 
-        val entry = getItem(position) ?: return view
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context).inflate(layoutResId, parent, false)
+        return ViewHolder(view)
+    }
 
-        val appIcon = view.findViewById<ImageView>(R.id.appIcon)
-        val appNameText = view.findViewById<TextView>(R.id.appName)
-        val countText = view.findViewById<TextView>(R.id.notificationCount)
-        val timeText = view.findViewById<TextView>(R.id.latestTime)
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val entry = items[position]
+
+        holder.itemView.setOnClickListener { onItemClick?.invoke(entry) }
+        holder.itemView.setOnLongClickListener {
+            onItemLongClick?.invoke(entry) ?: false
+        }
 
         // Имя приложения
         val appName = try {
@@ -41,24 +52,22 @@ class PackageSummaryAdapter(
         } catch (e: PackageManager.NameNotFoundException) {
             entry.packageName
         }
-        appNameText.text = appName
+        holder.appNameText.text = appName
 
-        // Количество уведомлений с иконкой стрелки (play)
-        countText.text = entry.notificationCount.toString()  // только число без лишних пробелов
+        // Количество уведомлений
+        holder.countText.text = entry.notificationCount.toString()
 
-        // Загружаем иконку и устанавливаем как левую составную drawable
         val playIcon = ContextCompat.getDrawable(context, R.drawable.ic_play_arrow)
         playIcon?.let {
-            // Задаём размеры, если это вектор или не имеет собственных границ
-            val size = (countText.lineHeight * 0.6f).toInt()  // подгоним под высоту строки
+            val size = (holder.countText.lineHeight * 0.6f).toInt()
             it.setBounds(0, 0, size, size)
-            countText.setCompoundDrawables(it, null, null, null)
+            holder.countText.setCompoundDrawables(it, null, null, null)
         }
 
         // Время последнего уведомления
-        timeText.text = dateFormat.format(Date(entry.latestTimestamp))
+        holder.timeText.text = dateFormat.format(Date(entry.latestTimestamp))
 
-        // Иконка с кэшированием (как раньше)
+        // Иконка приложения с кэшированием
         val icon = iconCache[entry.packageName] ?: run {
             try {
                 context.packageManager.getApplicationIcon(entry.packageName)
@@ -68,17 +77,16 @@ class PackageSummaryAdapter(
         }
         if (icon != null) {
             iconCache[entry.packageName] = icon
-            appIcon.setImageDrawable(icon)
+            holder.appIcon.setImageDrawable(icon)
         } else {
-            appIcon.setImageDrawable(defaultIcon)
+            holder.appIcon.setImageDrawable(defaultIcon)
         }
-
-        return view
     }
 
+    override fun getItemCount(): Int = items.size
+
     fun updateData(newList: List<NotificationDatabaseHelper.PackageSummary>) {
-        clear()
-        addAll(newList)
+        items = newList
         notifyDataSetChanged()
     }
 }

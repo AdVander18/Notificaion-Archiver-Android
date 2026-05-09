@@ -1,166 +1,114 @@
 package com.example.notificationarchiver
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Bundle
-import android.widget.AdapterView
-import android.widget.ListView
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import java.io.File
-import java.io.FileOutputStream
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.notificationarchiver.databinding.ActivityNotificationHistoryBinding
+import com.google.android.material.color.DynamicColors
 
 class NotificationHistoryActivity : AppCompatActivity() {
-
+    private lateinit var binding: ActivityNotificationHistoryBinding
+    private lateinit var viewModel: NotificationHistoryViewModel
     private lateinit var adapter: NotificationAdapter
-    private lateinit var listView: ListView
     private var packageName: String? = null
-    private val prefs by lazy { getSharedPreferences("app_settings", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        DynamicColors.applyToActivitiesIfAvailable(application)
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_notification_history)
+        binding = ActivityNotificationHistoryBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        listView = findViewById(R.id.historyListView)
-        val titleView = findViewById<TextView>(R.id.historyTitle)
-        val openAppFab = findViewById<FloatingActionButton>(R.id.openAppFab)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.mainContainer)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
 
+        viewModel = ViewModelProvider(this)[NotificationHistoryViewModel::class.java]
         packageName = intent.getStringExtra("packageName")
-        val dbHelper = NotificationDatabaseHelper.getInstance(this)
 
-        val notifications = getNotifications(dbHelper)
-
-        titleView.text = if (packageName != null) {
-            val appName = try {
-                val appInfo = packageManager.getApplicationInfo(packageName!!, 0)
+        val appName = packageName?.let { pkg ->
+            try {
+                val appInfo = packageManager.getApplicationInfo(pkg, 0)
                 packageManager.getApplicationLabel(appInfo).toString()
-            } catch (e: PackageManager.NameNotFoundException) {
-                packageName!!
+            } catch (e: PackageManager.NameNotFoundException) { pkg }
+        } ?: "История уведомлений"
+        // Используем Toolbar вместо отдельного TextView
+        binding.toolbar.title = "Уведомления от $appName"
+
+        binding.historyRecyclerView.layoutManager = LinearLayoutManager(this)
+        adapter = NotificationAdapter(
+            this,
+            R.layout.item_notification,
+            emptyList(),
+            onItemLongClick = { entry ->
+                showNotificationMenu(entry)
+                true
             }
-            "Уведомления от $appName"
-        } else {
-            "История уведомлений"
+        )
+        binding.historyRecyclerView.adapter = adapter
+
+        viewModel.notifications.observe(this) { list ->
+            adapter.updateData(list)
         }
+        viewModel.loadNotifications(packageName)
 
-        adapter = NotificationAdapter(this, R.layout.item_notification, notifications)
-        listView.adapter = adapter
-
-        // Долгое нажатие — меню действий (копирование / удаление)
-        listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
-            val entry = adapter.getItem(position) ?: return@OnItemLongClickListener true
-
-            val items = mutableListOf<String>()
-            val actions = mutableListOf<() -> Unit>()
-
-            val hasText = !entry.title.isNullOrEmpty() || !entry.text.isNullOrEmpty()
-            val hasImage = entry.image != null && entry.image.isNotEmpty()
-
-            // Копирование текста / изображения
-            if (hasText) {
-                items.add("Копировать текст")
-                actions.add {
-                    // ... (без изменений)
-                }
-            } else if (hasImage) {
-                items.add("Копировать изображение")
-                actions.add {
-                    // ... (без изменений)
-                }
-            }
-
-            // --- НОВОЕ: удаление изображения (только для одного приложения) ---
-            if (hasImage && packageName != null) {
-                items.add("Удалить изображение")
-                actions.add {
-                    if (prefs.getBoolean("skipDeleteImages", false)) {
-                        // Удаление без подтверждения
-                        dbHelper.removeImageForNotification(entry.id)
-                        refreshNotifications(dbHelper)
-                        Toast.makeText(this@NotificationHistoryActivity, "Изображение удалено", Toast.LENGTH_SHORT).show()
-                    } else {
-                        // С подтверждением
-                        AlertDialog.Builder(this@NotificationHistoryActivity)
-                            .setTitle("Удалить изображение?")
-                            .setMessage("Удалить изображение из этого уведомления?")
-                            .setPositiveButton("Удалить") { _, _ ->
-                                dbHelper.removeImageForNotification(entry.id)
-                                refreshNotifications(dbHelper)
-                                Toast.makeText(this@NotificationHistoryActivity, "Изображение удалено", Toast.LENGTH_SHORT).show()
-                            }
-                            .setNegativeButton("Отмена", null)
-                            .show()
-                    }
-                }
-            }
-
-            // Удаление уведомления целиком
-            items.add("Удалить уведомление")
-            actions.add {
-                if (prefs.getBoolean("skipDeleteNotifications", false)) {
-                    dbHelper.deleteNotification(entry.id)
-                    refreshNotifications(dbHelper)
-                    Toast.makeText(this@NotificationHistoryActivity, "Уведомление удалено", Toast.LENGTH_SHORT).show()
-                } else {
-                    AlertDialog.Builder(this@NotificationHistoryActivity)
-                        .setTitle("Удалить уведомление?")
-                        .setMessage("Вы действительно хотите удалить это уведомление?")
-                        .setPositiveButton("Удалить") { _, _ ->
-                            dbHelper.deleteNotification(entry.id)
-                            refreshNotifications(dbHelper)
-                            Toast.makeText(this@NotificationHistoryActivity, "Уведомление удалено", Toast.LENGTH_SHORT).show()
-                        }
-                        .setNegativeButton("Отмена", null)
-                        .show()
-                }
-            }
-
-            AlertDialog.Builder(this@NotificationHistoryActivity)
-                .setTitle("Действия с уведомлением")
-                .setItems(items.toTypedArray()) { _, which ->
-                    actions[which].invoke()
-                }
-                .setNegativeButton("Отмена", null)
-                .show()
-
-            true
-        }
-
-        // FAB открытия приложения
         if (packageName != null) {
-            openAppFab.show()
-            openAppFab.setOnClickListener {
-                val launchIntent = packageManager.getLaunchIntentForPackage(packageName!!)
-                if (launchIntent != null) {
-                    startActivity(launchIntent)
-                } else {
-                    Toast.makeText(this, "Невозможно открыть приложение", Toast.LENGTH_SHORT).show()
-                }
+            binding.openAppFab.show()
+            binding.openAppFab.setOnClickListener {
+                val intent = packageManager.getLaunchIntentForPackage(packageName!!)
+                if (intent != null) startActivity(intent)
+                else Toast.makeText(this, "Не удалось открыть", Toast.LENGTH_SHORT).show()
             }
         } else {
-            openAppFab.hide()
+            binding.openAppFab.hide()
         }
     }
+    private fun showNotificationMenu(entry: NotificationDatabaseHelper.NotificationEntry) {
+        val items = mutableListOf<String>()
+        val actions = mutableListOf<() -> Unit>()
 
-    private fun getNotifications(dbHelper: NotificationDatabaseHelper): List<NotificationDatabaseHelper.NotificationEntry> {
-        return if (packageName != null) {
-            dbHelper.getNotificationsByPackage(packageName!!)
-        } else {
-            dbHelper.getAllNotifications()
+        if (!entry.title.isNullOrEmpty() || !entry.text.isNullOrEmpty()) {
+            items.add("Копировать текст")
+            actions.add { /* реализация копирования */ }
         }
-    }
+        if (entry.image != null && entry.image.isNotEmpty()) {
+            items.add("Копировать изображение")
+            actions.add { /* реализация копирования */ }
+            items.add("Удалить изображение")
+            actions.add {
+                ConfirmationHelper.confirmIfNeeded(this, viewModel.preferences.skipDeleteImages,
+                    "Удалить изображение", "Удалить изображение из уведомления?") {
+                    viewModel.removeImage(entry.id)
+                    viewModel.loadNotifications(packageName)
+                    Toast.makeText(this, "Изображение удалено", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        items.add("Удалить уведомление")
+        actions.add {
+            ConfirmationHelper.confirmIfNeeded(this, viewModel.preferences.skipDeleteNotifications,
+                "Удалить уведомление", "Удалить это уведомление?") {
+                viewModel.deleteNotification(entry.id)
+                viewModel.loadNotifications(packageName)
+                Toast.makeText(this, "Уведомление удалено", Toast.LENGTH_SHORT).show()
+            }
+        }
 
-    private fun refreshNotifications(dbHelper: NotificationDatabaseHelper) {
-        val newList = getNotifications(dbHelper)
-        adapter.updateData(newList)
+        AlertDialog.Builder(this)
+            .setTitle("Действия с уведомлением")
+            .setItems(items.toTypedArray()) { _, which -> actions[which].invoke() }
+            .setNegativeButton("Отмена", null)
+            .show()
     }
 }

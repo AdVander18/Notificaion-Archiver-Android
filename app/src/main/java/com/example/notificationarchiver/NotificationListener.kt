@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.lifecycle.MutableLiveData
-import android.content.SharedPreferences
 import java.io.ByteArrayOutputStream
 
 class NotificationListener : NotificationListenerService() {
@@ -36,47 +35,33 @@ class NotificationListener : NotificationListenerService() {
         super.onNotificationPosted(sbn)
         sbn ?: return
 
-        val packageName = sbn.packageName
-        val prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
-        val ignored = prefs.getStringSet("ignored_packages", emptySet()) ?: emptySet()
+        val prefs = (applicationContext as App).preferencesManager
+        if (prefs.ignoredPackages.contains(sbn.packageName)) return
 
-        if (packageName in ignored) return  // пропускаем игнорируемое приложение
-        sbn?.let {
-            val prefs = applicationContext.getSharedPreferences("app_settings", MODE_PRIVATE)
-            val ignoredPackages = prefs.getStringSet("ignored_packages", emptySet()) ?: emptySet()
-            if (ignoredPackages.contains(it.packageName)) {
-                return  // игнорируем уведомление
-            }
-            val notification: Notification = it.notification
-            val extras = notification.extras
+        val notification = sbn.notification
+        val extras = notification.extras
 
-            val packageName = it.packageName
-            val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
-            val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-            val timestamp = System.currentTimeMillis()
-            val key = it.key
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        val timestamp = System.currentTimeMillis()
 
-            // Извлечение картинки (основное изображение BigPicture)
-            val picture: Bitmap? = if (extras.containsKey(Notification.EXTRA_PICTURE)) {
-                @Suppress("DEPRECATION")
-                extras.getParcelable(Notification.EXTRA_PICTURE)
-            } else null
+        val picture: Bitmap? = if (extras.containsKey(Notification.EXTRA_PICTURE)) {
+            @Suppress("DEPRECATION")
+            extras.getParcelable(Notification.EXTRA_PICTURE)
+        } else null
 
-            val imageBytes: ByteArray? = if (picture != null) {
-                // Сохраняем в оригинальном разрешении без ресайза
-                val stream = ByteArrayOutputStream()
-                picture.compress(Bitmap.CompressFormat.PNG, 80, stream)
+        val imageBytes: ByteArray? = picture?.let {
+            ByteArrayOutputStream().use { stream ->
+                it.compress(Bitmap.CompressFormat.PNG, 80, stream)
                 stream.toByteArray()
-            } else null
-
-            val notificationData = NotificationData(packageName, title, text, timestamp)
-            notificationLiveData.postValue(notificationData)
-
-            val disableDuplicates = prefs.getBoolean("disable_duplicate_notifications", false)
-
-            val dbHelper = NotificationDatabaseHelper.getInstance(applicationContext)
-            dbHelper.upsertNotification(packageName, title, text, timestamp, key, disableDuplicates, imageBytes)
+            }
         }
+
+        notificationLiveData.postValue(NotificationData(sbn.packageName, title, text, timestamp))
+
+        val repo = (applicationContext as App).repository
+        repo.upsertNotification(sbn.packageName, title, text, timestamp, sbn.key, imageBytes)
     }
+
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {}
 }

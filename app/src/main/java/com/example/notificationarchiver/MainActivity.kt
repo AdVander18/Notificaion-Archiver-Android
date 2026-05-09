@@ -1,235 +1,167 @@
 package com.example.notificationarchiver
 
-import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Intent
-import android.content.SharedPreferences
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.AdapterView
-import android.widget.ListView
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.Observer
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.notificationarchiver.databinding.ActivityMainBinding
+import com.google.android.material.color.DynamicColors
 
 class MainActivity : AppCompatActivity() {
-
-    private lateinit var viewModel: NotificationViewModel
-    private lateinit var statusTextView: TextView
-    private lateinit var notificationListView: ListView
+    private lateinit var binding: ActivityMainBinding
+    private lateinit var viewModel: MainViewModel
     private lateinit var adapter: PackageSummaryAdapter
-    private val prefs by lazy { getSharedPreferences("app_settings", MODE_PRIVATE) }
 
-    private val notificationListenerLauncher = registerForActivityResult(
+    private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) {
-        checkNotificationListenerPermission()
-    }
+    ) { checkNotificationPermission() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        DynamicColors.applyToActivitiesIfAvailable(application)
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        setSupportActionBar(binding.topAppBar)
 
-        viewModel = ViewModelProvider(this)[NotificationViewModel::class.java]
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.mainContainer)) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
 
-        statusTextView = findViewById(R.id.statusTextView)
-        notificationListView = findViewById(R.id.notificationListView)
+        viewModel = ViewModelProvider(this)[MainViewModel::class.java]
 
-        // Адаптер для сводки по приложениям
-        adapter = PackageSummaryAdapter(this, R.layout.item_app_summary, emptyList())
-        notificationListView.adapter = adapter
+        // Инициализация RecyclerView
+        binding.notificationRecyclerView.layoutManager = LinearLayoutManager(this)
+        adapter = PackageSummaryAdapter(
+            this,
+            R.layout.item_app_summary,
+            emptyList(),
+            onItemClick = { summary ->
+                startActivity(Intent(this, NotificationHistoryActivity::class.java).apply {
+                    putExtra("packageName", summary.packageName)
+                })
+            },
+            onItemLongClick = { summary ->
+                showContextMenu(summary.packageName)
+                true
+            }
+        )
+        binding.notificationRecyclerView.adapter = adapter
 
-        viewModel.latestNotification.observe(this, Observer { _ ->
-            loadPackageSummaries()
-        })
+        viewModel.packageSummaries.observe(this) { summaries ->
+            adapter.updateData(summaries)
+        }
 
-        checkNotificationListenerPermission()
-        loadPackageSummaries()
+        viewModel.latestNotification.observe(this) { _ ->
+            viewModel.loadPackageSummaries()
+        }
 
+        checkNotificationPermission()
         if (!isNotificationListenerEnabled()) {
             showPermissionRequestDialog()
         }
+    }
 
-        // Обработка нажатия – переход к уведомлениям приложения
-        notificationListView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
-            val summary = adapter.getItem(position)
-            summary?.let {
-                val intent = Intent(this, NotificationHistoryActivity::class.java).apply {
-                    putExtra("packageName", it.packageName)
+    private fun showContextMenu(packageName: String) {
+        val items = arrayOf("Открыть приложение", "Удалить изображения",
+            "Удалить уведомления", "Игнорировать", "Удалить и игнорировать")
+        AlertDialog.Builder(this)
+            .setTitle("Действия")
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> openApp(packageName)
+                    1 -> removeImages(packageName)
+                    2 -> deleteNotifications(packageName)
+                    3 -> ignore(packageName)
+                    4 -> deleteAndIgnore(packageName)
                 }
-                startActivity(intent)
             }
-        }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
 
-        // Долгое нажатие – меню действий
-        notificationListView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
-            val summary = adapter.getItem(position) ?: return@OnItemLongClickListener true
-            val packageName = summary.packageName
+    private fun openApp(pkg: String) {
+        val intent = packageManager.getLaunchIntentForPackage(pkg)
+        if (intent != null) startActivity(intent)
+        else Toast.makeText(this, "Не удалось открыть", Toast.LENGTH_SHORT).show()
+    }
 
-            val items = arrayOf(
-                "Открыть приложение",
-                "Удалить изображения с уведомлений",
-                "Удалить уведомления",
-                "Игнорировать уведомление приложения",
-                "Удалить уведомления и игнорировать приложение"
-            )
-
-            AlertDialog.Builder(this)
-                .setTitle("Действия")
-                .setItems(items) { _, which ->
-                    when (which) {
-                        0 -> openApp(packageName)
-                        1 -> removeImagesForPackage(packageName)
-                        2 -> deleteNotificationsForPackage(packageName)
-                        3 -> ignorePackage(packageName)
-                        4 -> deleteAndIgnore(packageName) // используем новый метод
-                    }
-                }
-                .setNegativeButton("Отмена", null)
-                .show()
-            true
+    private fun removeImages(pkg: String) {
+        ConfirmationHelper.confirmIfNeeded(this, viewModel.preferences.skipDeleteImages,
+            "Удалить изображения", "Удалить все изображения уведомлений для этого приложения?") {
+            (application as App).repository.removeImagesForPackage(pkg)
+            viewModel.loadPackageSummaries()
+            Toast.makeText(this, "Изображения удалены", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // --------------- Методы с учётом настроек подтверждений ---------------
-
-    private fun openApp(packageName: String) {
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-        if (launchIntent != null) {
-            startActivity(launchIntent)
-        } else {
-            Toast.makeText(this, "Не удалось открыть приложение", Toast.LENGTH_SHORT).show()
+    private fun deleteNotifications(pkg: String) {
+        ConfirmationHelper.confirmIfNeeded(this, viewModel.preferences.skipDeleteNotifications,
+            "Удалить уведомления", "Удалить все уведомления для этого приложения?") {
+            viewModel.deleteNotificationsByPackage(pkg)
+            Toast.makeText(this, "Уведомления удалены", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun removeImagesForPackage(packageName: String) {
-        if (prefs.getBoolean("skipDeleteImages", false)) {
-            performRemoveImagesForPackage(packageName)
-        } else {
-            AlertDialog.Builder(this)
-                .setTitle("Удалить изображения")
-                .setMessage("Удалить все изображения уведомлений для этого приложения?")
-                .setPositiveButton("Удалить") { _, _ -> performRemoveImagesForPackage(packageName) }
-                .setNegativeButton("Отмена", null)
-                .show()
+    private fun ignore(pkg: String) {
+        ConfirmationHelper.confirmIfNeeded(this, viewModel.preferences.skipIgnoreApps,
+            "Игнорировать", "Добавить приложение в игнор-лист?") {
+            viewModel.ignorePackage(pkg)
+            Toast.makeText(this, "Добавлено в игнор-лист", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun performRemoveImagesForPackage(packageName: String) {
-        val dbHelper = NotificationDatabaseHelper.getInstance(this)
-        dbHelper.removeImagesForPackage(packageName)
-        loadPackageSummaries()
-        Toast.makeText(this, "Изображения удалены", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun deleteNotificationsForPackage(packageName: String) {
-        if (prefs.getBoolean("skipDeleteNotifications", false)) {
-            performDeleteNotificationsForPackage(packageName)
-        } else {
-            AlertDialog.Builder(this)
-                .setTitle("Удалить уведомления")
-                .setMessage("Удалить все уведомления для этого приложения?")
-                .setPositiveButton("Удалить") { _, _ -> performDeleteNotificationsForPackage(packageName) }
-                .setNegativeButton("Отмена", null)
-                .show()
-        }
-    }
-
-    private fun performDeleteNotificationsForPackage(packageName: String) {
-        val dbHelper = NotificationDatabaseHelper.getInstance(this)
-        dbHelper.deleteNotificationsByPackage(packageName)
-        loadPackageSummaries()
-        Toast.makeText(this, "Уведомления удалены", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun ignorePackage(packageName: String) {
-        if (prefs.getBoolean("skipIgnoreApps", false)) {
-            performIgnorePackage(packageName)
-        } else {
-            AlertDialog.Builder(this)
-                .setTitle("Игнорировать приложение")
-                .setMessage("Добавить это приложение в игнор-лист? Уведомления от него больше не будут сохраняться.")
-                .setPositiveButton("Игнорировать") { _, _ -> performIgnorePackage(packageName) }
-                .setNegativeButton("Отмена", null)
-                .show()
-        }
-    }
-
-    private fun performIgnorePackage(packageName: String) {
-        val ignored = prefs.getStringSet("ignored_packages", emptySet())?.toMutableSet() ?: mutableSetOf()
-        ignored.add(packageName)
-        prefs.edit().putStringSet("ignored_packages", ignored).apply()
-        Toast.makeText(this, "Приложение добавлено в игнор-лист", Toast.LENGTH_SHORT).show()
-    }
-
-    // Комбинированное действие: удаление уведомлений + игнор
-    private fun deleteAndIgnore(packageName: String) {
-        val skipDelete = prefs.getBoolean("skipDeleteNotifications", false)
-        val skipIgnore = prefs.getBoolean("skipIgnoreApps", false)
-
+    private fun deleteAndIgnore(pkg: String) {
+        val skipDelete = viewModel.preferences.skipDeleteNotifications
+        val skipIgnore = viewModel.preferences.skipIgnoreApps
         if (skipDelete && skipIgnore) {
-            performDeleteNotificationsForPackage(packageName)
-            performIgnorePackage(packageName)
+            viewModel.deleteNotificationsByPackage(pkg)
+            viewModel.ignorePackage(pkg)
         } else {
             AlertDialog.Builder(this)
                 .setTitle("Удалить и игнорировать")
-                .setMessage("Удалить все уведомления этого приложения и добавить его в игнор-лист?")
+                .setMessage("Удалить уведомления и добавить в игнор-лист?")
                 .setPositiveButton("Да") { _, _ ->
-                    performDeleteNotificationsForPackage(packageName)
-                    performIgnorePackage(packageName)
+                    viewModel.deleteNotificationsByPackage(pkg)
+                    viewModel.ignorePackage(pkg)
                 }
                 .setNegativeButton("Отмена", null)
                 .show()
         }
     }
 
-    // --------------- Прочие методы (статистика, разрешения и т.д.) ---------------
-
-    private fun loadPackageSummaries() {
-        val dbHelper = NotificationDatabaseHelper.getInstance(this)
-        val summaryList = dbHelper.getPackageSummaryList()
-        adapter.updateData(summaryList)
-    }
-
-    private fun checkNotificationListenerPermission() {
-        val isEnabled = isNotificationListenerEnabled()
-        viewModel.setServiceActive(isEnabled)
-        if (!isEnabled) {
-            statusTextView.text = "Статус: Не активно"
-        }
+    private fun checkNotificationPermission() {
+        val enabled = isNotificationListenerEnabled()
+        viewModel.isServiceActive.observe(this) {}
     }
 
     private fun isNotificationListenerEnabled(): Boolean {
-        val enabledListeners = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-        val myListener = ComponentName(this, NotificationListener::class.java).flattenToString()
-        return enabledListeners?.contains(myListener) == true
+        val flat = ComponentName(this, NotificationListener::class.java).flattenToString()
+        return Settings.Secure.getString(contentResolver, "enabled_notification_listeners")?.contains(flat) == true
     }
 
     private fun showPermissionRequestDialog() {
         AlertDialog.Builder(this)
             .setTitle("Требуется разрешение")
-            .setMessage("Для работы приложения необходимо предоставить доступ к уведомлениям. Перейти в настройки?")
-            .setPositiveButton("Да") { _, _ ->
-                requestNotificationListenerPermission()
+            .setMessage("Предоставьте доступ к уведомлениям в настройках.")
+            .setPositiveButton("Перейти") { _, _ ->
+                notificationPermissionLauncher.launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
             }
-            .setNegativeButton("Отмена") { dialog, _ ->
-                dialog.dismiss()
-            }
+            .setNegativeButton("Отмена", null)
             .show()
-    }
-
-    private fun requestNotificationListenerPermission() {
-        if (!isNotificationListenerEnabled()) {
-            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-            notificationListenerLauncher.launch(intent)
-        } else {
-            Toast.makeText(this, "Доступ уже предоставлен", Toast.LENGTH_SHORT).show()
-        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -237,13 +169,11 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_settings -> {
-                startActivity(Intent(this, SettingsActivity::class.java))
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
+        R.id.action_settings -> {
+            startActivity(Intent(this, SettingsActivity::class.java))
+            true
         }
+        else -> super.onOptionsItemSelected(item)
     }
 }

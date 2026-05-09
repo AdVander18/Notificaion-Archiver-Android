@@ -5,10 +5,8 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class NotificationDatabaseHelper private constructor(context: Context) :
+class NotificationDatabaseHelper(context: Context) :
     SQLiteOpenHelper(context.applicationContext, DATABASE_NAME, null, DATABASE_VERSION) {
-
-    private val appContext: Context = context.applicationContext
 
     data class NotificationEntry(
         val id: Long,
@@ -22,22 +20,10 @@ class NotificationDatabaseHelper private constructor(context: Context) :
     companion object {
         private const val DATABASE_NAME = "notifications.db"
         private const val DATABASE_VERSION = 5
-        private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
-
-        @Volatile
-        private var instance: NotificationDatabaseHelper? = null
-
-        fun getInstance(context: Context): NotificationDatabaseHelper {
-            return instance ?: synchronized(this) {
-                instance ?: NotificationDatabaseHelper(context.applicationContext)
-                    .also { instance = it }
-            }
-        }
     }
 
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL(
-            """
+        db.execSQL("""
             CREATE TABLE notifications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 package_name TEXT,
@@ -47,8 +33,7 @@ class NotificationDatabaseHelper private constructor(context: Context) :
                 notification_key TEXT,
                 image BLOB
             )
-            """.trimIndent()
-        )
+        """.trimIndent())
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -64,153 +49,69 @@ class NotificationDatabaseHelper private constructor(context: Context) :
         }
     }
 
-    fun upsertNotification(
-        packageName: String,
-        title: String,
-        text: String,
-        timestamp: Long,
-        notificationKey: String?,
-        disableDuplicates: Boolean,
-        image: ByteArray? = null
-    ) {
-        val db = writableDatabase
-        val safeKey = notificationKey ?: "${packageName}_${System.nanoTime()}"
-
-        if (disableDuplicates) {
-            val cursor = db.query(
-                "notifications", arrayOf("id"),
-                "notification_key = ?", arrayOf(safeKey),
-                null, null, null
-            )
-            val exists = cursor.use { it.moveToFirst() }
-
-            if (exists) {
-                val values = ContentValues().apply {
-                    put("package_name", packageName)
-                    put("title", title)
-                    put("text", text)
-                    put("timestamp", timestamp)
-                    put("image", image)
-                }
-                db.update("notifications", values, "notification_key = ?", arrayOf(safeKey))
-                enforceDayLimit(db)
-            } else {
-                insertNew(db, packageName, title, text, timestamp, safeKey, image)
-                enforceLimit(db, packageName)
-                enforceDayLimit(db)
-            }
-        } else {
-            val uniqueKey = safeKey + "_" + System.nanoTime().toString()
-            insertNew(db, packageName, title, text, timestamp, uniqueKey, image)
-            // Применяем лимит
-            enforceLimit(db, packageName)
-            enforceDayLimit(db)
-        }
+    fun insertNotification(entry: NotificationEntry) {
+        writableDatabase.insert("notifications", null, ContentValues().apply {
+            put("package_name", entry.packageName)
+            put("title", entry.title)
+            put("text", entry.text)
+            put("timestamp", entry.timestamp)
+            put("notification_key", "${entry.packageName}_${System.nanoTime()}")
+            put("image", entry.image)
+        })
     }
 
-    private fun insertNew(
-        db: SQLiteDatabase,
-        packageName: String,
-        title: String,
-        text: String,
-        timestamp: Long,
-        notificationKey: String,
-        image: ByteArray? = null
-    ) {
-        val values = ContentValues().apply {
-            put("package_name", packageName)
-            put("title", title)
-            put("text", text)
-            put("timestamp", timestamp)
-            put("notification_key", notificationKey)
-            put("image", image)
-        }
-        db.insert("notifications", null, values)
+    fun updateNotificationByKey(key: String, entry: NotificationEntry) {
+        writableDatabase.update("notifications", ContentValues().apply {
+            put("package_name", entry.packageName)
+            put("title", entry.title)
+            put("text", entry.text)
+            put("timestamp", entry.timestamp)
+            put("image", entry.image)
+        }, "notification_key = ?", arrayOf(key))
     }
 
-    // Удаление самых старых уведомлений при превышении лимита
-    private fun enforceLimit(db: SQLiteDatabase, packageName: String) {
-        val prefs = appContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-        val max = prefs.getInt("max_notifications_per_app", 9999)
-        if (max <= 0) return  // 0 или меньше — без ограничений
+    fun notificationKeyExists(key: String): Boolean {
+        readableDatabase.query("notifications", arrayOf("id"),
+            "notification_key = ?", arrayOf(key), null, null, null
+        ).use { return it.moveToFirst() }
+    }
 
-        val countCursor = db.rawQuery(
-            "SELECT COUNT(*) FROM notifications WHERE package_name = ?",
-            arrayOf(packageName)
+    fun deleteOldestForPackage(packageName: String, limit: Int) {
+        if (limit <= 0) return
+        writableDatabase.execSQL(
+            "DELETE FROM notifications WHERE id IN (" +
+                    "SELECT id FROM notifications WHERE package_name = ? " +
+                    "ORDER BY timestamp ASC, id ASC LIMIT ?)",
+            arrayOf(packageName, limit.toString())
         )
-        val count = if (countCursor.moveToFirst()) countCursor.getInt(0) else 0
-        countCursor.close()
-
-        if (count > max) {
-            val excess = count - max
-            // Удаляем самые старые (сортировка по timestamp, затем по id)
-            db.execSQL(
-                "DELETE FROM notifications WHERE id IN (" +
-                        "SELECT id FROM notifications WHERE package_name = ? " +
-                        "ORDER BY timestamp ASC, id ASC LIMIT ?)",
-                arrayOf(packageName, excess.toString())
-            )
-        }
     }
 
-    private fun enforceDayLimit(db: SQLiteDatabase) {
-        val prefs = appContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-        val maxDays = prefs.getInt("max_notification_days", 0) // 0 = без ограничения
-        if (maxDays <= 0) return
-
-        val oldestAllowedTime = System.currentTimeMillis() - maxDays * DAY_MILLIS
-        db.delete("notifications", "timestamp < ?", arrayOf(oldestAllowedTime.toString()))
+    fun deleteOlderThan(timestampMillis: Long) {
+        writableDatabase.delete("notifications", "timestamp < ?", arrayOf(timestampMillis.toString()))
     }
 
-    fun getAllNotifications(): List<NotificationEntry> {
+    fun getAllNotifications(): List<NotificationEntry> = query(null, null)
+
+    fun getNotificationsByPackage(packageName: String): List<NotificationEntry> =
+        query("package_name = ?", arrayOf(packageName))
+
+    private fun query(selection: String?, args: Array<String>?): List<NotificationEntry> {
         val list = mutableListOf<NotificationEntry>()
-        val db = readableDatabase
-        val cursor = db.query("notifications", null, null, null, null, null, "timestamp DESC")
-        cursor.use {
-            while (it.moveToNext()) {
-                val imageBytes = it.getBlob(it.getColumnIndexOrThrow("image"))
-                list.add(
-                    NotificationEntry(
-                        id = it.getLong(it.getColumnIndexOrThrow("id")),
-                        packageName = it.getString(it.getColumnIndexOrThrow("package_name")),
-                        title = it.getString(it.getColumnIndexOrThrow("title")),
-                        text = it.getString(it.getColumnIndexOrThrow("text")),
-                        timestamp = it.getLong(it.getColumnIndexOrThrow("timestamp")),
-                        image = imageBytes
-                    )
-                )
+        readableDatabase.query("notifications", null, selection, args, null, null, "timestamp DESC").use { cursor ->
+            while (cursor.moveToNext()) {
+                list.add(NotificationEntry(
+                    id = cursor.getLong(cursor.getColumnIndexOrThrow("id")),
+                    packageName = cursor.getString(cursor.getColumnIndexOrThrow("package_name")),
+                    title = cursor.getString(cursor.getColumnIndexOrThrow("title")),
+                    text = cursor.getString(cursor.getColumnIndexOrThrow("text")),
+                    timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")),
+                    image = cursor.getBlob(cursor.getColumnIndexOrThrow("image"))
+                ))
             }
         }
         return list
     }
 
-    fun getNotificationsByPackage(packageName: String): List<NotificationEntry> {
-        val list = mutableListOf<NotificationEntry>()
-        val db = readableDatabase
-        val cursor = db.query(
-            "notifications", null,
-            "package_name = ?", arrayOf(packageName),
-            null, null, "timestamp DESC"
-        )
-        cursor.use {
-            while (it.moveToNext()) {
-                val imageBytes = it.getBlob(it.getColumnIndexOrThrow("image"))
-                list.add(
-                    NotificationEntry(
-                        id = it.getLong(it.getColumnIndexOrThrow("id")),
-                        packageName = it.getString(it.getColumnIndexOrThrow("package_name")),
-                        title = it.getString(it.getColumnIndexOrThrow("title")),
-                        text = it.getString(it.getColumnIndexOrThrow("text")),
-                        timestamp = it.getLong(it.getColumnIndexOrThrow("timestamp")),
-                        image = imageBytes
-                    )
-                )
-            }
-        }
-        return list
-    }
-
-    // внутри NotificationDatabaseHelper
     data class PackageSummary(
         val packageName: String,
         val notificationCount: Int,
@@ -219,53 +120,44 @@ class NotificationDatabaseHelper private constructor(context: Context) :
 
     fun getPackageSummaryList(): List<PackageSummary> {
         val list = mutableListOf<PackageSummary>()
-        val db = readableDatabase
-        val cursor = db.rawQuery(
+        readableDatabase.rawQuery(
             "SELECT package_name, COUNT(*) AS cnt, MAX(timestamp) AS latest " +
-                    "FROM notifications GROUP BY package_name ORDER BY latest DESC",
-            null
-        )
-        cursor.use {
-            while (it.moveToNext()) {
-                list.add(
-                    PackageSummary(
-                        packageName = it.getString(0),
-                        notificationCount = it.getInt(1),
-                        latestTimestamp = it.getLong(2)
-                    )
-                )
+                    "FROM notifications GROUP BY package_name ORDER BY latest DESC", null
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                list.add(PackageSummary(
+                    packageName = cursor.getString(0),
+                    notificationCount = cursor.getInt(1),
+                    latestTimestamp = cursor.getLong(2)
+                ))
             }
         }
         return list
     }
 
-    fun deleteNotification(id: Long) {
-        val db = writableDatabase
-        db.delete("notifications", "id = ?", arrayOf(id.toString()))
-    }
+    fun deleteNotification(id: Long) =
+        writableDatabase.delete("notifications", "id = ?", arrayOf(id.toString()))
 
-    // Удалить все уведомления конкретного пакета
-    fun deleteNotificationsByPackage(packageName: String) {
-        val db = writableDatabase
-        db.delete("notifications", "package_name = ?", arrayOf(packageName))
-    }
+    fun deleteNotificationsByPackage(packageName: String) =
+        writableDatabase.delete("notifications", "package_name = ?", arrayOf(packageName))
 
-    // Удалить все изображения у одного приложения
     fun removeImagesForPackage(packageName: String) {
-        val db = writableDatabase
-        val values = ContentValues().apply {
-            putNull("image")
-        }
-        db.update("notifications", values, "package_name = ?", arrayOf(packageName))
+        writableDatabase.update("notifications",
+            ContentValues().apply { putNull("image") },
+            "package_name = ?", arrayOf(packageName))
     }
 
-    // Удалить изображение у одного уведомления
     fun removeImageForNotification(id: Long) {
-        val db = writableDatabase
-        val values = ContentValues().apply {
-            putNull("image")
-        }
-        db.update("notifications", values, "id = ?", arrayOf(id.toString()))
+        writableDatabase.update("notifications",
+            ContentValues().apply { putNull("image") },
+            "id = ?", arrayOf(id.toString()))
+    }
+
+    fun deleteAllNotifications() = writableDatabase.delete("notifications", null, null)
+
+    fun removeAllImages() {
+        writableDatabase.update("notifications",
+            ContentValues().apply { putNull("image") }, null, null)
     }
 
     data class Statistics(
@@ -277,50 +169,23 @@ class NotificationDatabaseHelper private constructor(context: Context) :
 
     fun getStatistics(): Statistics {
         val db = readableDatabase
-
-        // Общее количество уведомлений
         val totalCursor = db.rawQuery("SELECT COUNT(*) FROM notifications", null)
-        val totalCount = if (totalCursor.moveToFirst()) totalCursor.getInt(0) else 0
+        val total = if (totalCursor.moveToFirst()) totalCursor.getInt(0) else 0
         totalCursor.close()
 
-        // За последние 24 часа
-        val twentyFourHoursAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
-        val recentCursor = db.rawQuery(
-            "SELECT COUNT(*) FROM notifications WHERE timestamp > ?",
-            arrayOf(twentyFourHoursAgo.toString())
-        )
-        val recentCount = if (recentCursor.moveToFirst()) recentCursor.getInt(0) else 0
+        val dayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+        val recentCursor = db.rawQuery("SELECT COUNT(*) FROM notifications WHERE timestamp > ?", arrayOf(dayAgo.toString()))
+        val recent = if (recentCursor.moveToFirst()) recentCursor.getInt(0) else 0
         recentCursor.close()
 
-        // Суммарная длина текстовых полей (title + text)
-        val textCursor = db.rawQuery(
-            "SELECT SUM(LENGTH(title) + LENGTH(text)) FROM notifications", null
-        )
-        val textMemory = if (textCursor.moveToFirst()) textCursor.getLong(0) else 0L
+        val textCursor = db.rawQuery("SELECT SUM(LENGTH(title) + LENGTH(text)) FROM notifications", null)
+        val textMem = if (textCursor.moveToFirst()) textCursor.getLong(0) else 0L
         textCursor.close()
 
-        // Суммарный размер изображений (BLOB)
-        val imageCursor = db.rawQuery(
-            "SELECT SUM(COALESCE(LENGTH(image), 0)) FROM notifications", null
-        )
-        val imageMemory = if (imageCursor.moveToFirst()) imageCursor.getLong(0) else 0L
+        val imageCursor = db.rawQuery("SELECT SUM(COALESCE(LENGTH(image), 0)) FROM notifications", null)
+        val imageMem = if (imageCursor.moveToFirst()) imageCursor.getLong(0) else 0L
         imageCursor.close()
 
-        return Statistics(totalCount, recentCount, textMemory, imageMemory)
-    }
-
-    // Удалить все записи уведомлений
-    fun deleteAllNotifications() {
-        val db = writableDatabase
-        db.delete("notifications", null, null)
-    }
-
-    // Установить изображение в null для всех уведомлений
-    fun removeAllImages() {
-        val db = writableDatabase
-        val values = ContentValues().apply {
-            putNull("image")
-        }
-        db.update("notifications", values, null, null)
+        return Statistics(total, recent, textMem, imageMem)
     }
 }

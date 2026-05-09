@@ -3,11 +3,11 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:layout_marginTop="?attr/actionBarSize">
+    android:fitsSystemWindows="true">
 
     <ListView
         android:id="@+id/listViewIgnoredApps"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="?attr/actionBarSize"/>
+        android:layout_height="match_parent"/>
+
 </LinearLayout>

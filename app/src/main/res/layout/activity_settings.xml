@@ -1,190 +1,329 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/mainContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:layout_marginTop="?attr/actionBarSize">
-
-    <Switch
-        android:id="@+id/switchDisableDuplicateNotifications"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="?attr/actionBarSize"
-        android:text="Не сохранять обновления уведомлений" />
-
-    <!-- Лимит уведомлений на приложение -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Макс. уведомлений на приложение" />
-
-        <EditText
-            android:id="@+id/etMaxNotificationsPerApp"
-            android:layout_width="100dp"
-            android:layout_height="wrap_content"
-            android:inputType="number"
-            android:text="100" />
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/btnSaveMaxNotificationsPerApp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end"
-        android:text="Сохранить"
-        android:layout_marginTop="4dp" />
-    <!-- Лимит по дням -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Макс. дней хранения уведомлений" />
-
-        <EditText
-            android:id="@+id/etMaxDays"
-            android:layout_width="100dp"
-            android:layout_height="wrap_content"
-            android:inputType="number"
-            android:text="365" />
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/btnSaveMaxDays"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end"
-        android:text="Сохранить"
-        android:layout_marginTop="4dp" />
-
-    <!-- Раздел Статистика -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="Статистика"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+    android:background="?attr/colorSurface"
+    android:fitsSystemWindows="true"
+    android:paddingHorizontal="16dp"
+    android:clipToPadding="false">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:orientation="horizontal">
+        android:orientation="vertical"
+        android:paddingTop="24dp"
+        android:paddingBottom="32dp">
 
-        <TextView
-            android:layout_width="0dp"
+        <com.google.android.material.appbar.AppBarLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Памяти занимают уведомления" />
+            android:fitsSystemWindows="true">
+        <!-- Toolbar inline -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:title="Настройки"
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            style="@style/Widget.Material3.Toolbar.Surface" />
+        </com.google.android.material.appbar.AppBarLayout>
 
+        <!-- Секция Лимиты -->
         <TextView
-            android:id="@+id/tvNotificationsMemory"
+            style="@style/TextAppearance.Material3.TitleSmall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Пока 0" />
-    </LinearLayout>
+            android:text="Лимиты"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:layout_width="0dp"
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Памяти занимают изображения" />
+            app:cardElevation="0dp"
+            app:cardCornerRadius="24dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorSurfaceVariant"
+            android:backgroundTint="?attr/colorSurfaceVariant">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
 
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/maxNotificationsLayout"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Макс. уведомлений на приложение"
+                    app:endIconMode="clear_text"
+                    app:helperText="Оставьте 100 по умолчанию">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etMaxNotificationsPerApp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:text="100" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/maxDaysLayout"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="Макс. дней хранения"
+                    app:helperText="365 дней по умолчанию">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etMaxDays"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:text="365" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <Button
+                    android:id="@+id/btnSaveLimits"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="end"
+                    android:layout_marginTop="12dp"
+                    android:text="Сохранить лимиты" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Переключатели -->
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchDisableDuplicateNotifications"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Не сохранять обновления уведомлений" />
+
+        <!-- Статистика -->
         <TextView
-            android:id="@+id/tvImagesMemory"
+            style="@style/TextAppearance.Material3.TitleSmall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Пока 0" />
+            android:text="Статистика"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardElevation="0dp"
+            app:cardCornerRadius="24dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorSurfaceVariant"
+            android:backgroundTint="?attr/colorSurfaceVariant">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="8dp">
+
+                <!-- Память уведомлений -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="14dp"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:contentDescription="Память уведомлений"
+                        app:srcCompat="@drawable/ic_memory"
+                        app:tint="?attr/colorPrimary" />
+
+                    <TextView
+                        style="@style/TextAppearance.Material3.BodyLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Памяти занимают уведомления"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <TextView
+                        android:id="@+id/tvNotificationsMemory"
+                        style="@style/TextAppearance.Material3.TitleMedium"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 MB"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorSurfaceVariant" />
+
+                <!-- Память изображений -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="14dp"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:contentDescription="Память изображений"
+                        app:srcCompat="@drawable/ic_image"
+                        app:tint="?attr/colorPrimary" />
+
+                    <TextView
+                        style="@style/TextAppearance.Material3.BodyLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Памяти занимают изображения"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <TextView
+                        android:id="@+id/tvImagesMemory"
+                        style="@style/TextAppearance.Material3.TitleMedium"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 MB"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorSurfaceVariant" />
+
+                <!-- Всего уведомлений -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="14dp"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:contentDescription="Всего уведомлений"
+                        app:srcCompat="@drawable/ic_notifications_total"
+                        app:tint="?attr/colorPrimary" />
+
+                    <TextView
+                        style="@style/TextAppearance.Material3.BodyLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Пришло уведомлений за всё время"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <TextView
+                        android:id="@+id/tvTotalNotifications"
+                        style="@style/TextAppearance.Material3.TitleMedium"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorSurfaceVariant" />
+
+                <!-- За последние 24 часа -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="14dp"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:contentDescription="За 24 часа"
+                        app:srcCompat="@drawable/ic_schedule"
+                        app:tint="?attr/colorPrimary" />
+
+                    <TextView
+                        style="@style/TextAppearance.Material3.BodyLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Пришло уведомлений за последние 24 часа"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <TextView
+                        android:id="@+id/tvNotifications24h"
+                        style="@style/TextAppearance.Material3.TitleMedium"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <!-- Кнопка обновления статистики -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRefreshStats"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="end"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="Обновить статистику"
+                    app:icon="@drawable/ic_refresh" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Кнопки действий -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSkipConfirmation"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Удалить подтверждение для..." />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDeleteAllNotifications"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Удалить все уведомления" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnManageIgnoredApps"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Игнорируемые приложения" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDeleteAllImages"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Удалить все изображения" />
     </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Пришло уведомлений за всё время" />
-
-        <TextView
-            android:id="@+id/tvTotalNotifications"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Пока 0" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Пришло уведомлений за последние 24 часа" />
-
-        <TextView
-            android:id="@+id/tvNotifications24h"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Пока 0" />
-    </LinearLayout>
-
-    <!-- Кнопка отключения подтверждений -->
-    <Button
-        android:id="@+id/btnSkipConfirmationSettings"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="Удалить подтверждение для" />
-
-    <!-- Кнопки удаления -->
-    <Button
-        android:id="@+id/btnDeleteAllNotifications"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Удалить все уведомления" />
-
-    <Button
-        android:id="@+id/btnManageIgnoredApps"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Управление игнорируемыми приложениями" />
-
-    <Button
-        android:id="@+id/btnDeleteAllImages"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Удалить все изображения" />
-
-</LinearLayout>
+</androidx.core.widget.NestedScrollView>

@@ -7,32 +7,44 @@ import android.graphics.drawable.Drawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
 import java.text.SimpleDateFormat
 import java.util.*
 
 class NotificationAdapter(
-    context: Context,
-    resource: Int,
-    items: List<NotificationDatabaseHelper.NotificationEntry>
-) : ArrayAdapter<NotificationDatabaseHelper.NotificationEntry>(context, resource, items.toMutableList()) {
+    private val context: Context,
+    private val layoutResId: Int,
+    private var items: List<NotificationDatabaseHelper.NotificationEntry>,
+    private val onItemClick: ((NotificationDatabaseHelper.NotificationEntry) -> Unit)? = null,
+    private val onItemLongClick: ((NotificationDatabaseHelper.NotificationEntry) -> Boolean)? = null
+) : RecyclerView.Adapter<NotificationAdapter.ViewHolder>() {
 
     private val iconCache = mutableMapOf<String, Drawable?>()
     private val defaultIcon: Drawable = context.resources.getDrawable(android.R.drawable.sym_def_app_icon, null)
 
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val view: View = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_notification, parent, false)
+    inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val appIcon: ImageView = itemView.findViewById(R.id.appIcon)
+        val appNameText: TextView = itemView.findViewById(R.id.appName)
+        val titleText: TextView = itemView.findViewById(R.id.titleText)
+        val bodyText: TextView = itemView.findViewById(R.id.bodyText)
+        val timeText: TextView = itemView.findViewById(R.id.timeText)
+        val notificationImage: ImageView = itemView.findViewById(R.id.notificationImage)
+    }
 
-        val entry = getItem(position) ?: return view
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context).inflate(layoutResId, parent, false)
+        return ViewHolder(view)
+    }
 
-        val appIcon = view.findViewById<ImageView>(R.id.appIcon)
-        val appNameText = view.findViewById<TextView>(R.id.appName)
-        val titleText = view.findViewById<TextView>(R.id.titleText)
-        val bodyText = view.findViewById<TextView>(R.id.bodyText)
-        val timeText = view.findViewById<TextView>(R.id.timeText)
-        val notificationImage = view.findViewById<ImageView>(R.id.notificationImage)
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val entry = items[position]
+
+        holder.itemView.setOnClickListener { onItemClick?.invoke(entry) }
+        holder.itemView.setOnLongClickListener {
+            onItemLongClick?.invoke(entry) ?: false
+        }
 
         val appName = try {
             val appInfo = context.packageManager.getApplicationInfo(entry.packageName, 0)
@@ -40,12 +52,12 @@ class NotificationAdapter(
         } catch (e: PackageManager.NameNotFoundException) {
             entry.packageName
         }
-        appNameText.text = appName
-        titleText.text = entry.title
-        bodyText.text = entry.text
+        holder.appNameText.text = appName
+        holder.titleText.text = entry.title
+        holder.bodyText.text = entry.text
 
         val sdf = SimpleDateFormat("dd.MM.yy HH:mm:ss", Locale.getDefault())
-        timeText.text = sdf.format(Date(entry.timestamp))
+        holder.timeText.text = sdf.format(Date(entry.timestamp))
 
         val icon = iconCache[entry.packageName] ?: run {
             try {
@@ -55,29 +67,26 @@ class NotificationAdapter(
             }
         }
         if (icon != null) {
-            // Кэшируем только успешно полученную иконку
             iconCache[entry.packageName] = icon
-            appIcon.setImageDrawable(icon)
+            holder.appIcon.setImageDrawable(icon)
         } else {
-            appIcon.setImageDrawable(defaultIcon)
+            holder.appIcon.setImageDrawable(defaultIcon)
         }
 
-        // Показ картинки уведомления, если есть
         if (entry.image != null && entry.image.isNotEmpty()) {
             val bitmap = BitmapFactory.decodeByteArray(entry.image, 0, entry.image.size)
-            notificationImage.setImageBitmap(bitmap)
-            notificationImage.visibility = View.VISIBLE
+            holder.notificationImage.setImageBitmap(bitmap)
+            holder.notificationImage.visibility = View.VISIBLE
         } else {
-            notificationImage.setImageBitmap(null)
-            notificationImage.visibility = View.GONE
+            holder.notificationImage.setImageBitmap(null)
+            holder.notificationImage.visibility = View.GONE
         }
-
-        return view
     }
 
+    override fun getItemCount(): Int = items.size
+
     fun updateData(newList: List<NotificationDatabaseHelper.NotificationEntry>) {
-        clear()
-        addAll(newList)
+        items = newList
         notifyDataSetChanged()
     }
 }
