@@ -13,6 +13,65 @@
         android:layout_marginTop="?attr/actionBarSize"
         android:text="Не сохранять обновления уведомлений" />
 
+    <!-- Лимит уведомлений на приложение -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Макс. уведомлений на приложение" />
+
+        <EditText
+            android:id="@+id/etMaxNotificationsPerApp"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:text="100" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnSaveMaxNotificationsPerApp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:text="Сохранить"
+        android:layout_marginTop="4dp" />
+    <!-- Лимит по дням -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Макс. дней хранения уведомлений" />
+
+        <EditText
+            android:id="@+id/etMaxDays"
+            android:layout_width="100dp"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:text="365" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnSaveMaxDays"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:text="Сохранить"
+        android:layout_marginTop="4dp" />
+
     <!-- Раздел Статистика -->
     <TextView
         android:layout_width="wrap_content"
@@ -22,7 +81,6 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <!-- Памяти занимают уведомления -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -42,7 +100,6 @@
             android:text="Пока 0" />
     </LinearLayout>
 
-    <!-- Памяти занимают изображения -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -62,7 +119,6 @@
             android:text="Пока 0" />
     </LinearLayout>
 
-    <!-- Пришло уведомлений за всё время -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -82,7 +138,6 @@
             android:text="Пока 0" />
     </LinearLayout>
 
-    <!-- Пришло уведомлений за последние 24 часа -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -101,5 +156,35 @@
             android:layout_height="wrap_content"
             android:text="Пока 0" />
     </LinearLayout>
+
+    <!-- Кнопка отключения подтверждений -->
+    <Button
+        android:id="@+id/btnSkipConfirmationSettings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="Удалить подтверждение для" />
+
+    <!-- Кнопки удаления -->
+    <Button
+        android:id="@+id/btnDeleteAllNotifications"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Удалить все уведомления" />
+
+    <Button
+        android:id="@+id/btnManageIgnoredApps"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Управление игнорируемыми приложениями" />
+
+    <Button
+        android:id="@+id/btnDeleteAllImages"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Удалить все изображения" />
 
 </LinearLayout>

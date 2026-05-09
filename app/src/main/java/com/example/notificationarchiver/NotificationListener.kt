@@ -34,6 +34,13 @@ class NotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
+        sbn ?: return
+
+        val packageName = sbn.packageName
+        val prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
+        val ignored = prefs.getStringSet("ignored_packages", emptySet()) ?: emptySet()
+
+        if (packageName in ignored) return  // пропускаем игнорируемое приложение
         sbn?.let {
             val prefs = applicationContext.getSharedPreferences("app_settings", MODE_PRIVATE)
             val ignoredPackages = prefs.getStringSet("ignored_packages", emptySet()) ?: emptySet()
@@ -71,4 +78,5 @@ class NotificationListener : NotificationListenerService() {
             dbHelper.upsertNotification(packageName, title, text, timestamp, key, disableDuplicates, imageBytes)
         }
     }
+    override fun onNotificationRemoved(sbn: StatusBarNotification?) {}
 }

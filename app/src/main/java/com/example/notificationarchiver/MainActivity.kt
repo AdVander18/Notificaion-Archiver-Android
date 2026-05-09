@@ -4,7 +4,6 @@ import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.SharedPreferences
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Menu
@@ -17,7 +16,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
@@ -25,7 +23,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusTextView: TextView
     private lateinit var notificationListView: ListView
     private lateinit var adapter: PackageSummaryAdapter
-    private lateinit var prefs: SharedPreferences
+    private val prefs by lazy { getSharedPreferences("app_settings", MODE_PRIVATE) }
 
     private val notificationListenerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -38,12 +36,11 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         viewModel = ViewModelProvider(this)[NotificationViewModel::class.java]
-        prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
 
         statusTextView = findViewById(R.id.statusTextView)
         notificationListView = findViewById(R.id.notificationListView)
 
-        // Новый адаптер для сводки по приложениям
+        // Адаптер для сводки по приложениям
         adapter = PackageSummaryAdapter(this, R.layout.item_app_summary, emptyList())
         notificationListView.adapter = adapter
 
@@ -69,7 +66,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Долгое нажатие – меню действий (без изменений)
+        // Долгое нажатие – меню действий
         notificationListView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
             val summary = adapter.getItem(position) ?: return@OnItemLongClickListener true
             val packageName = summary.packageName
@@ -90,10 +87,7 @@ class MainActivity : AppCompatActivity() {
                         1 -> removeImagesForPackage(packageName)
                         2 -> deleteNotificationsForPackage(packageName)
                         3 -> ignorePackage(packageName)
-                        4 -> {
-                            deleteNotificationsForPackage(packageName)
-                            ignorePackage(packageName)
-                        }
+                        4 -> deleteAndIgnore(packageName) // используем новый метод
                     }
                 }
                 .setNegativeButton("Отмена", null)
@@ -101,6 +95,8 @@ class MainActivity : AppCompatActivity() {
             true
         }
     }
+
+    // --------------- Методы с учётом настроек подтверждений ---------------
 
     private fun openApp(packageName: String) {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
@@ -112,6 +108,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun removeImagesForPackage(packageName: String) {
+        if (prefs.getBoolean("skipDeleteImages", false)) {
+            performRemoveImagesForPackage(packageName)
+        } else {
+            AlertDialog.Builder(this)
+                .setTitle("Удалить изображения")
+                .setMessage("Удалить все изображения уведомлений для этого приложения?")
+                .setPositiveButton("Удалить") { _, _ -> performRemoveImagesForPackage(packageName) }
+                .setNegativeButton("Отмена", null)
+                .show()
+        }
+    }
+
+    private fun performRemoveImagesForPackage(packageName: String) {
         val dbHelper = NotificationDatabaseHelper.getInstance(this)
         dbHelper.removeImagesForPackage(packageName)
         loadPackageSummaries()
@@ -119,6 +128,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun deleteNotificationsForPackage(packageName: String) {
+        if (prefs.getBoolean("skipDeleteNotifications", false)) {
+            performDeleteNotificationsForPackage(packageName)
+        } else {
+            AlertDialog.Builder(this)
+                .setTitle("Удалить уведомления")
+                .setMessage("Удалить все уведомления для этого приложения?")
+                .setPositiveButton("Удалить") { _, _ -> performDeleteNotificationsForPackage(packageName) }
+                .setNegativeButton("Отмена", null)
+                .show()
+        }
+    }
+
+    private fun performDeleteNotificationsForPackage(packageName: String) {
         val dbHelper = NotificationDatabaseHelper.getInstance(this)
         dbHelper.deleteNotificationsByPackage(packageName)
         loadPackageSummaries()
@@ -126,13 +148,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun ignorePackage(packageName: String) {
+        if (prefs.getBoolean("skipIgnoreApps", false)) {
+            performIgnorePackage(packageName)
+        } else {
+            AlertDialog.Builder(this)
+                .setTitle("Игнорировать приложение")
+                .setMessage("Добавить это приложение в игнор-лист? Уведомления от него больше не будут сохраняться.")
+                .setPositiveButton("Игнорировать") { _, _ -> performIgnorePackage(packageName) }
+                .setNegativeButton("Отмена", null)
+                .show()
+        }
+    }
+
+    private fun performIgnorePackage(packageName: String) {
         val ignored = prefs.getStringSet("ignored_packages", emptySet())?.toMutableSet() ?: mutableSetOf()
         ignored.add(packageName)
         prefs.edit().putStringSet("ignored_packages", ignored).apply()
         Toast.makeText(this, "Приложение добавлено в игнор-лист", Toast.LENGTH_SHORT).show()
     }
 
-    /** Загружаем сводку по пакетам вместо полного списка уведомлений */
+    // Комбинированное действие: удаление уведомлений + игнор
+    private fun deleteAndIgnore(packageName: String) {
+        val skipDelete = prefs.getBoolean("skipDeleteNotifications", false)
+        val skipIgnore = prefs.getBoolean("skipIgnoreApps", false)
+
+        if (skipDelete && skipIgnore) {
+            performDeleteNotificationsForPackage(packageName)
+            performIgnorePackage(packageName)
+        } else {
+            AlertDialog.Builder(this)
+                .setTitle("Удалить и игнорировать")
+                .setMessage("Удалить все уведомления этого приложения и добавить его в игнор-лист?")
+                .setPositiveButton("Да") { _, _ ->
+                    performDeleteNotificationsForPackage(packageName)
+                    performIgnorePackage(packageName)
+                }
+                .setNegativeButton("Отмена", null)
+                .show()
+        }
+    }
+
+    // --------------- Прочие методы (статистика, разрешения и т.д.) ---------------
+
     private fun loadPackageSummaries() {
         val dbHelper = NotificationDatabaseHelper.getInstance(this)
         val summaryList = dbHelper.getPackageSummaryList()
@@ -183,7 +240,6 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_settings -> {
-                // Переход в окно настроек (пока пустое)
                 startActivity(Intent(this, SettingsActivity::class.java))
                 true
             }

@@ -6,7 +6,9 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 class NotificationDatabaseHelper private constructor(context: Context) :
-    SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+    SQLiteOpenHelper(context.applicationContext, DATABASE_NAME, null, DATABASE_VERSION) {
+
+    private val appContext: Context = context.applicationContext
 
     data class NotificationEntry(
         val id: Long,
@@ -14,12 +16,13 @@ class NotificationDatabaseHelper private constructor(context: Context) :
         val title: String,
         val text: String,
         val timestamp: Long,
-        val image: ByteArray? = null       // новое поле для картинки
+        val image: ByteArray? = null
     )
 
     companion object {
         private const val DATABASE_NAME = "notifications.db"
-        private const val DATABASE_VERSION = 5   // увеличена версия БД
+        private const val DATABASE_VERSION = 5
+        private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
 
         @Volatile
         private var instance: NotificationDatabaseHelper? = null
@@ -57,7 +60,6 @@ class NotificationDatabaseHelper private constructor(context: Context) :
             onCreate(db)
         }
         if (oldVersion < 5) {
-            // добавляем колонку для изображений
             db.execSQL("ALTER TABLE notifications ADD COLUMN image BLOB")
         }
     }
@@ -69,7 +71,7 @@ class NotificationDatabaseHelper private constructor(context: Context) :
         timestamp: Long,
         notificationKey: String?,
         disableDuplicates: Boolean,
-        image: ByteArray? = null          // новое поле
+        image: ByteArray? = null
     ) {
         val db = writableDatabase
         val safeKey = notificationKey ?: "${packageName}_${System.nanoTime()}"
@@ -88,15 +90,21 @@ class NotificationDatabaseHelper private constructor(context: Context) :
                     put("title", title)
                     put("text", text)
                     put("timestamp", timestamp)
-                    put("image", image)      // обновляем и картинку
+                    put("image", image)
                 }
                 db.update("notifications", values, "notification_key = ?", arrayOf(safeKey))
+                enforceDayLimit(db)
             } else {
                 insertNew(db, packageName, title, text, timestamp, safeKey, image)
+                enforceLimit(db, packageName)
+                enforceDayLimit(db)
             }
         } else {
             val uniqueKey = safeKey + "_" + System.nanoTime().toString()
             insertNew(db, packageName, title, text, timestamp, uniqueKey, image)
+            // Применяем лимит
+            enforceLimit(db, packageName)
+            enforceDayLimit(db)
         }
     }
 
@@ -107,7 +115,7 @@ class NotificationDatabaseHelper private constructor(context: Context) :
         text: String,
         timestamp: Long,
         notificationKey: String,
-        image: ByteArray? = null          // новое поле
+        image: ByteArray? = null
     ) {
         val values = ContentValues().apply {
             put("package_name", packageName)
@@ -115,9 +123,43 @@ class NotificationDatabaseHelper private constructor(context: Context) :
             put("text", text)
             put("timestamp", timestamp)
             put("notification_key", notificationKey)
-            put("image", image)            // сохраняем картинку
+            put("image", image)
         }
         db.insert("notifications", null, values)
+    }
+
+    // Удаление самых старых уведомлений при превышении лимита
+    private fun enforceLimit(db: SQLiteDatabase, packageName: String) {
+        val prefs = appContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val max = prefs.getInt("max_notifications_per_app", 9999)
+        if (max <= 0) return  // 0 или меньше — без ограничений
+
+        val countCursor = db.rawQuery(
+            "SELECT COUNT(*) FROM notifications WHERE package_name = ?",
+            arrayOf(packageName)
+        )
+        val count = if (countCursor.moveToFirst()) countCursor.getInt(0) else 0
+        countCursor.close()
+
+        if (count > max) {
+            val excess = count - max
+            // Удаляем самые старые (сортировка по timestamp, затем по id)
+            db.execSQL(
+                "DELETE FROM notifications WHERE id IN (" +
+                        "SELECT id FROM notifications WHERE package_name = ? " +
+                        "ORDER BY timestamp ASC, id ASC LIMIT ?)",
+                arrayOf(packageName, excess.toString())
+            )
+        }
+    }
+
+    private fun enforceDayLimit(db: SQLiteDatabase) {
+        val prefs = appContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val maxDays = prefs.getInt("max_notification_days", 0) // 0 = без ограничения
+        if (maxDays <= 0) return
+
+        val oldestAllowedTime = System.currentTimeMillis() - maxDays * DAY_MILLIS
+        db.delete("notifications", "timestamp < ?", arrayOf(oldestAllowedTime.toString()))
     }
 
     fun getAllNotifications(): List<NotificationEntry> {
@@ -208,13 +250,22 @@ class NotificationDatabaseHelper private constructor(context: Context) :
         db.delete("notifications", "package_name = ?", arrayOf(packageName))
     }
 
-    // Установить изображения в null для всех уведомлений пакета
+    // Удалить все изображения у одного приложения
     fun removeImagesForPackage(packageName: String) {
         val db = writableDatabase
         val values = ContentValues().apply {
             putNull("image")
         }
         db.update("notifications", values, "package_name = ?", arrayOf(packageName))
+    }
+
+    // Удалить изображение у одного уведомления
+    fun removeImageForNotification(id: Long) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            putNull("image")
+        }
+        db.update("notifications", values, "id = ?", arrayOf(id.toString()))
     }
 
     data class Statistics(
@@ -256,5 +307,20 @@ class NotificationDatabaseHelper private constructor(context: Context) :
         imageCursor.close()
 
         return Statistics(totalCount, recentCount, textMemory, imageMemory)
+    }
+
+    // Удалить все записи уведомлений
+    fun deleteAllNotifications() {
+        val db = writableDatabase
+        db.delete("notifications", null, null)
+    }
+
+    // Установить изображение в null для всех уведомлений
+    fun removeAllImages() {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            putNull("image")
+        }
+        db.update("notifications", values, null, null)
     }
 }
