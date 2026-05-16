@@ -46,4 +46,28 @@ class PreferencesManager(context: Context) {
     var skipDeleteImages: Boolean
         get() = prefs.getBoolean("skipDeleteImages", false)
         set(value) = prefs.edit().putBoolean("skipDeleteImages", value).apply()
+
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "auto") ?: "auto"
+        set(value) = prefs.edit().putString("theme_mode", value).apply()
+
+    // Приложения, уведомления которых сохраняются, но удаляются из статус-бара
+    val archiveOnlyPackages: Set<String>
+        get() = prefs.getStringSet("archive_only_packages", emptySet()) ?: emptySet()
+
+    fun addArchiveOnlyPackage(packageName: String) {
+        val set = archiveOnlyPackages.toMutableSet()
+        set.add(packageName)
+        prefs.edit().putStringSet("archive_only_packages", set).apply()
+    }
+
+    fun removeArchiveOnlyPackage(packageName: String) {
+        val set = archiveOnlyPackages.toMutableSet()
+        set.remove(packageName)
+        prefs.edit().putStringSet("archive_only_packages", set).apply()
+    }
+
+    var saveImages: Boolean
+        get() = prefs.getBoolean("save_images", true)
+        set(value) = prefs.edit().putBoolean("save_images", value).apply()
 }

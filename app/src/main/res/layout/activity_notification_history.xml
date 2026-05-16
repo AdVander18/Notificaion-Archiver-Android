@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -8,18 +7,18 @@
     android:background="?attr/colorSurface"
     android:fitsSystemWindows="true">
 
+    <!-- Убираем fitsSystemWindows -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fitsSystemWindows="true">
+        android:layout_height="wrap_content">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:title="История уведомлений"
-        app:navigationIcon="?attr/homeAsUpIndicator"
-        style="@style/Widget.Material3.Toolbar.Surface" />
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:title="История уведомлений"
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            style="@style/Widget.Material3.Toolbar.Surface" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -32,6 +31,7 @@
         android:paddingBottom="88dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
+    <!-- FAB без изменений -->
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/openAppFab"
         android:layout_width="wrap_content"

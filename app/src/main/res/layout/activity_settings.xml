@@ -14,21 +14,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingTop="24dp"
         android:paddingBottom="32dp">
-
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fitsSystemWindows="true">
-        <!-- Toolbar inline -->
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:title="Настройки"
-            app:navigationIcon="?attr/homeAsUpIndicator"
-            style="@style/Widget.Material3.Toolbar.Surface" />
+            android:layout_height="wrap_content">
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:title="Настройки"
+                app:navigationIcon="?attr/homeAsUpIndicator"
+                style="@style/Widget.Material3.Toolbar.Surface" />
         </com.google.android.material.appbar.AppBarLayout>
 
         <!-- Секция Лимиты -->
@@ -62,7 +58,7 @@
                     android:layout_height="wrap_content"
                     android:hint="Макс. уведомлений на приложение"
                     app:endIconMode="clear_text"
-                    app:helperText="Оставьте 100 по умолчанию">
+                    app:helperText="100 по умолчанию">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etMaxNotificationsPerApp"
                         android:layout_width="match_parent"
@@ -78,7 +74,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:hint="Макс. дней хранения"
-                    app:helperText="365 дней по умолчанию">
+                    app:helperText="365 по умолчанию">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etMaxDays"
                         android:layout_width="match_parent"
@@ -105,6 +101,56 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Не сохранять обновления уведомлений" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchSaveImages"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Сохранять изображения уведомлений" />
+
+        <!-- Секция выбора темы -->
+        <TextView
+            style="@style/TextAppearance.Material3.TitleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Тема"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/toggleThemeGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            app:checkedButton="@id/btnThemeAuto">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeAuto"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Авто" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeLight"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Дневная" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeDark"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Ночная" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <!-- Статистика -->
         <TextView
@@ -294,13 +340,53 @@
         </com.google.android.material.card.MaterialCardView>
 
         <!-- Кнопки действий -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSkipConfirmation"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+        <LinearLayout
+            android:id="@+id/layoutSkipConfirmation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Удалить подтверждение для..." />
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/TextAppearance.Material3.TitleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Удалить подтверждение для"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:id="@+id/rowSkipConfirmation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingVertical="12dp"
+                android:backgroundTint="?attr/colorSurfaceVariant">
+
+                <TextView
+                    android:id="@+id/tvSkipConfirmationValue"
+                    style="@style/TextAppearance.Material3.BodyLarge"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Ничего не выбрано"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_arrow_drop_down"
+                    android:contentDescription="Выбрать"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDeleteAllNotifications"
@@ -319,11 +405,61 @@
             android:text="Игнорируемые приложения" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnManageArchiveOnlyApps"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Скрывать уведомления из статус-бара" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDeleteAllImages"
             style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="Удалить все изображения" />
+
+        <!-- Прочее -->
+        <TextView
+            style="@style/TextAppearance.Material3.TitleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Прочее"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTestNotification"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Тестовое уведомление" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnNotificationPermission"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Доступ к чтению уведомлений" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBatteryOptimization"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Оптимизация батареи" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/textVersion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="Версия"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
+
 </androidx.core.widget.NestedScrollView>

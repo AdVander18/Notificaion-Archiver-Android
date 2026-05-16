@@ -41,6 +41,11 @@
             android:label="Игнорируемые приложения"
             android:parentActivityName=".SettingsActivity" />
 
+        <activity
+            android:name=".ArchiveOnlyAppsActivity"
+            android:label="Скрытие уведомлений"
+            android:parentActivityName=".SettingsActivity" />
+
         <service
             android:name=".NotificationListener"
             android:exported="false"

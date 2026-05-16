@@ -31,6 +31,8 @@ class NotificationListener : NotificationListenerService() {
         isServiceActive.postValue(false)
     }
 
+    private val processedKeys = mutableSetOf<String>()
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
         sbn ?: return
@@ -38,6 +40,14 @@ class NotificationListener : NotificationListenerService() {
         val prefs = (applicationContext as App).preferencesManager
         if (prefs.ignoredPackages.contains(sbn.packageName)) return
 
+        // --- Проверка режима подавления обновлений ---
+        if (prefs.disableDuplicateNotifications) {
+            val key = sbn.key
+            if (key != null && !processedKeys.add(key)) {
+                // Ключ уже был обработан – это обновление, пропускаем
+                return
+            }
+        }
         val notification = sbn.notification
         val extras = notification.extras
 
@@ -60,7 +70,12 @@ class NotificationListener : NotificationListenerService() {
         notificationLiveData.postValue(NotificationData(sbn.packageName, title, text, timestamp))
 
         val repo = (applicationContext as App).repository
-        repo.upsertNotification(sbn.packageName, title, text, timestamp, sbn.key, imageBytes)
+        val imageToSave = if (prefs.saveImages) imageBytes else null
+        repo.upsertNotification(sbn.packageName, title, text, timestamp, sbn.key, imageToSave)
+
+        if (prefs.archiveOnlyPackages.contains(sbn.packageName)) {
+            cancelNotification(sbn.key)
+        }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {}

@@ -1,6 +1,8 @@
 package com.example.notificationarchiver
 
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -27,11 +29,28 @@ class IgnoredAppsActivity : AppCompatActivity() {
         adapter = IgnoredAppAdapter(this, viewModel)
         binding.listViewIgnoredApps.adapter = adapter
 
-        viewModel.apps.observe(this) { apps ->
+        // Наблюдаем фильтрованный список
+        viewModel.filteredApps.observe(this) { apps ->
             adapter.clear()
             adapter.addAll(apps)
             adapter.notifyDataSetChanged()
         }
+
+        // Состояние загрузки
+        viewModel.isLoading.observe(this) { loading ->
+            binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+            binding.listViewIgnoredApps.visibility = if (loading) View.INVISIBLE else View.VISIBLE
+        }
+
+        binding.buttonBack.setOnClickListener { finish() }
+
+        binding.editTextSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                viewModel.setQuery(s?.toString() ?: "")
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
     }
 }
 

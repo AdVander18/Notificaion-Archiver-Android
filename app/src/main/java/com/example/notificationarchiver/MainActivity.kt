@@ -28,18 +28,15 @@ class MainActivity : AppCompatActivity() {
     ) { checkNotificationPermission() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        DynamicColors.applyToActivitiesIfAvailable(application)
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setSupportActionBar(binding.topAppBar)
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.mainContainer)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+        binding.topAppBar.setNavigationOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
+        binding.topAppBar.navigationContentDescription = "Настройки"
 
         viewModel = ViewModelProvider(this)[MainViewModel::class.java]
 
@@ -162,18 +159,5 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Отмена", null)
             .show()
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
-        R.id.action_settings -> {
-            startActivity(Intent(this, SettingsActivity::class.java))
-            true
-        }
-        else -> super.onOptionsItemSelected(item)
     }
 }

@@ -25,7 +25,7 @@ class NotificationHistoryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityNotificationHistoryBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        binding.toolbar.setNavigationOnClickListener { onBackPressed() }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.mainContainer)) { v, insets ->

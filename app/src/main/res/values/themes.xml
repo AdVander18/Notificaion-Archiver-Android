@@ -1,4 +1,5 @@
 <!-- res/values/themes.xml -->
+<!-- Дневная тема -->
 <resources>
     <!-- Базовая тема Material 3 без ActionBar (будем использовать тулбар) -->
     <style name="Theme.NotificationArchiver" parent="Theme.Material3.DayNight.NoActionBar">
@@ -23,6 +24,6 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <!-- Сделать статус-бар тёмным/светлым в зависимости от фона -->
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>
