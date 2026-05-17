@@ -19,6 +19,9 @@ class IgnoredAppsActivity : AppCompatActivity() {
     private lateinit var viewModel: IgnoredAppsViewModel
     private lateinit var adapter: IgnoredAppAdapter
 
+    // Флаг, показывающий, завершена ли первая загрузка
+    private var firstLoadDone = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityIgnoredAppsBinding.inflate(layoutInflater)
@@ -29,17 +32,27 @@ class IgnoredAppsActivity : AppCompatActivity() {
         adapter = IgnoredAppAdapter(this, viewModel)
         binding.listViewIgnoredApps.adapter = adapter
 
-        // Наблюдаем фильтрованный список
+        // Показываем анимацию сразу при старте
+        binding.loadingDotsView.visibility = View.VISIBLE
+        binding.loadingDotsView.startAnimationLoop()
+        binding.listViewIgnoredApps.visibility = View.INVISIBLE
+
+        // Наблюдаем фильтрованный список – именно здесь мы узнаём, что данные готовы
         viewModel.filteredApps.observe(this) { apps ->
             adapter.clear()
             adapter.addAll(apps)
             adapter.notifyDataSetChanged()
-        }
 
-        // Состояние загрузки
-        viewModel.isLoading.observe(this) { loading ->
-            binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
-            binding.listViewIgnoredApps.visibility = if (loading) View.INVISIBLE else View.VISIBLE
+            if (!firstLoadDone) {
+                firstLoadDone = true
+                // Делаем список видимым, но он пока закрыт слоем с точками
+                binding.listViewIgnoredApps.visibility = View.VISIBLE
+                binding.listViewIgnoredApps.post {
+                    // Когда список отрисовался – останавливаем анимацию и прячем точки
+                    binding.loadingDotsView.stopAnimationLoop()
+                    binding.loadingDotsView.visibility = View.GONE
+                }
+            }
         }
 
         binding.buttonBack.setOnClickListener { finish() }

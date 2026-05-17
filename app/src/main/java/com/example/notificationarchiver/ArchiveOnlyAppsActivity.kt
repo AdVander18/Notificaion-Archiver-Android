@@ -19,6 +19,9 @@ class ArchiveOnlyAppsActivity : AppCompatActivity() {
     private lateinit var viewModel: ArchiveOnlyAppsViewModel
     private lateinit var adapter: ArchiveOnlyAppAdapter
 
+    // Флаг завершения первой загрузки данных
+    private var firstLoadDone = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityArchiveOnlyAppsBinding.inflate(layoutInflater)
@@ -29,15 +32,27 @@ class ArchiveOnlyAppsActivity : AppCompatActivity() {
         adapter = ArchiveOnlyAppAdapter(this, viewModel)
         binding.listViewArchiveOnlyApps.adapter = adapter
 
+        // Запуск анимации при старте
+        binding.loadingDotsView.visibility = View.VISIBLE
+        binding.loadingDotsView.startAnimationLoop()
+        binding.listViewArchiveOnlyApps.visibility = View.INVISIBLE
+
+        // Наблюдаем за отфильтрованным списком – здесь узнаём, что данные готовы
         viewModel.filteredApps.observe(this) { apps ->
             adapter.clear()
             adapter.addAll(apps)
             adapter.notifyDataSetChanged()
-        }
 
-        viewModel.isLoading.observe(this) { loading ->
-            binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
-            binding.listViewArchiveOnlyApps.visibility = if (loading) View.INVISIBLE else View.VISIBLE
+            if (!firstLoadDone) {
+                firstLoadDone = true
+                // Делаем список видимым, но он пока скрыт анимацией
+                binding.listViewArchiveOnlyApps.visibility = View.VISIBLE
+                binding.listViewArchiveOnlyApps.post {
+                    // Когда список отрисован – останавливаем анимацию и прячем точки
+                    binding.loadingDotsView.stopAnimationLoop()
+                    binding.loadingDotsView.visibility = View.GONE
+                }
+            }
         }
 
         binding.buttonBack.setOnClickListener { finish() }

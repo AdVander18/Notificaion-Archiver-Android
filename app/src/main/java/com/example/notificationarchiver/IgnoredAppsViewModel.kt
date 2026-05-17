@@ -1,4 +1,3 @@
-// IgnoredAppsViewModel.kt
 package com.example.notificationarchiver
 
 import android.app.Application
@@ -7,9 +6,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.viewModelScope  // требуется lifecycle-viewmodel-ktx
-import kotlinx.coroutines.delay
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class IgnoredAppsViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = (application as App).preferencesManager
@@ -26,44 +26,46 @@ class IgnoredAppsViewModel(application: Application) : AndroidViewModel(applicat
         addSource(_query) { recomputeFilter() }
     }
 
-    // Состояние загрузки
+    // Состояние загрузки (необязательно, но может пригодиться)
     private val _isLoading = MutableLiveData(true)
     val isLoading: LiveData<Boolean> = _isLoading
 
     private fun recomputeFilter() {
-        val appsList = _apps.value ?: emptyList()
+        val appsList = _apps.value ?: return
         val query = _query.value ?: ""
         filteredApps.value = if (query.isBlank()) appsList
         else appsList.filter { it.appName.contains(query, ignoreCase = true) }
     }
 
     init {
-        loadAppsAsync()  // запускаем асинхронную загрузку
+        loadAppsAsync()
     }
 
-    /**
-     * Загружает список приложений асинхронно с небольшой задержкой,
-     * чтобы пользователь видел индикатор прогресса.
-     */
     private fun loadAppsAsync() {
         viewModelScope.launch {
             _isLoading.value = true
-            delay(400) // имитация загрузки (можно убрать, если список формируется быстро)
-            loadApps()
+            // Загружаем список в фоне, чтобы не блокировать анимацию
+            val appList = withContext(Dispatchers.IO) {
+                fetchApps()
+            }
+            _apps.value = appList   // обновление UI на главном потоке
             _isLoading.value = false
         }
     }
 
-    private fun loadApps() {
+    /**
+     * Получение и сортировка списка приложений.
+     * Выполняется на фоновом потоке, не трогает UI.
+     */
+    private fun fetchApps(): List<AppInfo> {
         val ignored = prefs.ignoredPackages
-        val allApps = pm.getInstalledApplications(0)
+        return pm.getInstalledApplications(PackageManager.GET_META_DATA)
             .filter { it.packageName != getApplication<App>().packageName }
             .map { AppInfo(it.packageName, it.loadLabel(pm).toString()) }
             .sortedWith(
                 compareByDescending<AppInfo> { ignored.contains(it.packageName) }
                     .thenBy { it.appName.lowercase() }
             )
-        _apps.value = allApps
     }
 
     fun isIgnored(packageName: String) = prefs.ignoredPackages.contains(packageName)
@@ -71,7 +73,8 @@ class IgnoredAppsViewModel(application: Application) : AndroidViewModel(applicat
     fun toggleIgnored(packageName: String, isChecked: Boolean) {
         if (isChecked) prefs.addIgnoredPackage(packageName)
         else prefs.removeIgnoredPackage(packageName)
-        loadApps() // обновит список и filteredApps
+        // Быстрое обновление без фонового потока, т.к. операция лёгкая
+        _apps.value = fetchApps()
     }
 
     fun setQuery(query: String) {

@@ -46,10 +46,10 @@
             android:visibility="invisible" />
     </LinearLayout>
 
-    <ProgressBar
-        android:id="@+id/progressBar"
-        style="?android:attr/progressBarStyleLarge"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center" />
+    <!-- Кастомная анимация загрузки (точки) -->
+    <com.example.notificationarchiver.LoadingDotsView
+        android:id="@+id/loadingDotsView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="visible" />
 </FrameLayout>
