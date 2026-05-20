@@ -43,6 +43,26 @@ class PreferencesManager(context: Context) {
         get() = prefs.getBoolean("skipIgnoreApps", false)
         set(value) = prefs.edit().putBoolean("skipIgnoreApps", value).apply()
 
+    val ignoredImagePackages: Set<String>
+        get() = prefs.getStringSet("ignored_image_packages", emptySet()) ?: emptySet()
+
+    fun addIgnoredImagePackage(packageName: String) {
+        val set = ignoredImagePackages.toMutableSet()
+        set.add(packageName)
+        prefs.edit().putStringSet("ignored_image_packages", set).apply()
+    }
+
+    fun removeIgnoredImagePackage(packageName: String) {
+        val set = ignoredImagePackages.toMutableSet()
+        set.remove(packageName)
+        prefs.edit().putStringSet("ignored_image_packages", set).apply()
+    }
+
+    // Пропуск подтверждения для игнорирования изображений (по аналогии с другими skip-флагами)
+    var skipIgnoreImages: Boolean
+        get() = prefs.getBoolean("skipIgnoreImages", false)
+        set(value) = prefs.edit().putBoolean("skipIgnoreImages", value).apply()
+
     var skipDeleteImages: Boolean
         get() = prefs.getBoolean("skipDeleteImages", false)
         set(value) = prefs.edit().putBoolean("skipDeleteImages", value).apply()

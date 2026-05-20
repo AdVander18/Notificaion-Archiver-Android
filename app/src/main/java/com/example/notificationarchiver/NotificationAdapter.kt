@@ -17,8 +17,8 @@ class NotificationAdapter(
     private val context: Context,
     private val layoutResId: Int,
     private var items: List<NotificationDatabaseHelper.NotificationEntry>,
-    private val onItemClick: ((NotificationDatabaseHelper.NotificationEntry) -> Unit)? = null,
-    private val onItemLongClick: ((NotificationDatabaseHelper.NotificationEntry) -> Boolean)? = null
+    private val onItemLongClick: ((NotificationDatabaseHelper.NotificationEntry) -> Boolean)? = null,
+    private val onItemClick: ((NotificationDatabaseHelper.NotificationEntry) -> Unit)? = null  // новый параметр
 ) : RecyclerView.Adapter<NotificationAdapter.ViewHolder>() {
 
     private val iconCache = mutableMapOf<String, Drawable?>()
@@ -41,7 +41,10 @@ class NotificationAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val entry = items[position]
 
-        holder.itemView.setOnClickListener { onItemClick?.invoke(entry) }
+        holder.itemView.setOnClickListener {
+            onItemClick?.invoke(entry)
+        }
+
         holder.itemView.setOnLongClickListener {
             onItemLongClick?.invoke(entry) ?: false
         }

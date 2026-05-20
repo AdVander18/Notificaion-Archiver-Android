@@ -13,14 +13,20 @@
         android:text="Удаления уведомлений" />
 
     <CheckBox
+        android:id="@+id/cbPopupDeleteImages"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Удаления изображений" />
+
+    <CheckBox
         android:id="@+id/cbPopupIgnoreApps"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Игнора приложений" />
 
     <CheckBox
-        android:id="@+id/cbPopupDeleteImages"
+        android:id="@+id/cbPopupIgnoreImages"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Удаления изображений" />
+        android:text="Игнора изображений" />
 </LinearLayout>

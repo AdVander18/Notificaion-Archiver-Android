@@ -70,7 +70,7 @@ class NotificationListener : NotificationListenerService() {
         notificationLiveData.postValue(NotificationData(sbn.packageName, title, text, timestamp))
 
         val repo = (applicationContext as App).repository
-        val imageToSave = if (prefs.saveImages) imageBytes else null
+        val imageToSave = if (prefs.saveImages && !prefs.ignoredImagePackages.contains(sbn.packageName)) imageBytes else null
         repo.upsertNotification(sbn.packageName, title, text, timestamp, sbn.key, imageToSave)
 
         if (prefs.archiveOnlyPackages.contains(sbn.packageName)) {

@@ -42,6 +42,10 @@
             android:parentActivityName=".SettingsActivity" />
 
         <activity
+            android:name=".IgnoredImagesActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ArchiveOnlyAppsActivity"
             android:label="Скрытие уведомлений"
             android:parentActivityName=".SettingsActivity" />

@@ -73,8 +73,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showContextMenu(packageName: String) {
-        val items = arrayOf("Открыть приложение", "Удалить изображения",
-            "Удалить уведомления", "Игнорировать", "Удалить и игнорировать")
+        val items = arrayOf(
+            "Открыть приложение",
+            "Удалить изображения",
+            "Удалить уведомления",
+            "Игнорировать",
+            "Игнорировать изображения",
+            "Удалить и игнорировать"
+        )
         AlertDialog.Builder(this)
             .setTitle("Действия")
             .setItems(items) { _, which ->
@@ -83,7 +89,8 @@ class MainActivity : AppCompatActivity() {
                     1 -> removeImages(packageName)
                     2 -> deleteNotifications(packageName)
                     3 -> ignore(packageName)
-                    4 -> deleteAndIgnore(packageName)
+                    4 -> ignoreImages(packageName)
+                    5 -> deleteAndIgnore(packageName)
                 }
             }
             .setNegativeButton("Отмена", null)
@@ -118,6 +125,17 @@ class MainActivity : AppCompatActivity() {
             "Игнорировать", "Добавить приложение в игнор-лист?") {
             viewModel.ignorePackage(pkg)
             Toast.makeText(this, "Добавлено в игнор-лист", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun ignoreImages(pkg: String) {
+        ConfirmationHelper.confirmIfNeeded(this, viewModel.preferences.skipIgnoreImages,
+            "Игнорировать изображения",
+            "Удалить все изображения и прекратить их сохранение для этого приложения?") {
+            (application as App).repository.removeImagesForPackage(pkg)
+            viewModel.preferences.addIgnoredImagePackage(pkg)
+            viewModel.loadPackageSummaries()
+            Toast.makeText(this, "Изображения игнорируются", Toast.LENGTH_SHORT).show()
         }
     }
 

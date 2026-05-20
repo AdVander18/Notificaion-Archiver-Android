@@ -78,6 +78,10 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, IgnoredAppsActivity::class.java))
         }
 
+        binding.btnManageIgnoredImages.setOnClickListener {
+            startActivity(Intent(this, IgnoredImagesActivity::class.java))
+        }
+
         binding.btnManageArchiveOnlyApps.setOnClickListener {
             startActivity(Intent(this, ArchiveOnlyAppsActivity::class.java))
         }
@@ -169,23 +173,27 @@ class SettingsActivity : AppCompatActivity() {
         val cbDelete = popupView.findViewById<CheckBox>(R.id.cbPopupDeleteNotifications)
         val cbIgnore = popupView.findViewById<CheckBox>(R.id.cbPopupIgnoreApps)
         val cbImages = popupView.findViewById<CheckBox>(R.id.cbPopupDeleteImages)
+        val cbIgnoreImages = popupView.findViewById<CheckBox>(R.id.cbPopupIgnoreImages)
 
         // Устанавливаем текущие состояния
         cbDelete.isChecked = viewModel.preferences.skipDeleteNotifications
         cbIgnore.isChecked = viewModel.preferences.skipIgnoreApps
         cbImages.isChecked = viewModel.preferences.skipDeleteImages
+        cbIgnoreImages.isChecked = viewModel.preferences.skipIgnoreImages
 
         // Слушатели изменений
         val checkedChangeListener = { _: Any? ->
             viewModel.preferences.skipDeleteNotifications = cbDelete.isChecked
             viewModel.preferences.skipIgnoreApps = cbIgnore.isChecked
             viewModel.preferences.skipDeleteImages = cbImages.isChecked
+            viewModel.preferences.skipIgnoreImages = cbIgnoreImages.isChecked
             updateSkipText()
         }
 
         cbDelete.setOnCheckedChangeListener { _, _ -> checkedChangeListener(null) }
         cbIgnore.setOnCheckedChangeListener { _, _ -> checkedChangeListener(null) }
         cbImages.setOnCheckedChangeListener { _, _ -> checkedChangeListener(null) }
+        cbIgnoreImages.setOnCheckedChangeListener { _, _ -> checkedChangeListener(null) }
 
         popupWindow = PopupWindow(
             popupView,
@@ -206,12 +214,12 @@ class SettingsActivity : AppCompatActivity() {
         if (prefs.skipDeleteNotifications) selected.add("Удаления уведомлений")
         if (prefs.skipIgnoreApps) selected.add("Игнора приложений")
         if (prefs.skipDeleteImages) selected.add("Удаления изображений")
+        if (prefs.skipIgnoreImages) selected.add("Игнора изображений")
 
         val text = when (selected.size) {
             0 -> "Ничего не выбрано"
             1 -> selected[0]
-            2, 3 -> "Выбрано ${selected.size} параметра"
-            else -> "Ничего не выбрано"
+            else -> "Выбрано ${selected.size} параметра"
         }
         binding.tvSkipConfirmationValue.text = text
     }
@@ -259,17 +267,28 @@ class SettingsActivity : AppCompatActivity() {
             manager.createNotificationChannel(channel)
         }
 
-        androidx.core.app.NotificationCompat.Builder(this, channelId)
+        // Загружаем изображение (стандартная иконка Android)
+        val largeIcon = android.graphics.BitmapFactory.decodeResource(
+            resources,
+            R.drawable.testnotification
+        )
+
+        val notification = androidx.core.app.NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Тестовое уведомление")
             .setContentText("Это проверка работы Notification Archiver")
+            .setLargeIcon(largeIcon)   // картинка в свёрнутом уведомлении
+            .setStyle(
+                androidx.core.app.NotificationCompat.BigPictureStyle()
+                    .bigPicture(largeIcon)       // картинка в развёрнутом виде
+                    .bigLargeIcon(null as android.graphics.Bitmap?)          // скрываем большую иконку в развёрнутом виде
+            )
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
-            .also { notification ->
-                val manager = getSystemService(android.app.NotificationManager::class.java)
-                manager.notify(999, notification)
-            }
+
+        val manager = getSystemService(android.app.NotificationManager::class.java)
+        manager.notify(999, notification)
         Toast.makeText(this, "Тестовое уведомление отправлено", Toast.LENGTH_SHORT).show()
     }
 
