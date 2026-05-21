@@ -23,7 +23,6 @@ class NotificationHistoryViewModel(application: Application) : AndroidViewModel(
 
     fun deleteNotification(id: Long) {
         repository.deleteNotification(id)
-        // перезагрузка будет вызвана после удаления
     }
 
     fun removeImage(id: Long) {

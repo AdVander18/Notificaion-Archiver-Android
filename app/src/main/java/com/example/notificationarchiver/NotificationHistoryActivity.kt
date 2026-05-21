@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.notificationarchiver.databinding.ActivityNotificationHistoryBinding
 import com.google.android.material.color.DynamicColors
+import com.example.notificationarchiver.BuildConfig
 import java.io.File
 
 class NotificationHistoryActivity : AppCompatActivity() {
@@ -113,7 +114,7 @@ class NotificationHistoryActivity : AppCompatActivity() {
                 // Получаем URI через FileProvider (authority должен совпадать с манифестом)
                 val uri = androidx.core.content.FileProvider.getUriForFile(
                     this,
-                    "${packageName}.fileprovider",
+                    "${BuildConfig.APPLICATION_ID}.fileprovider",
                     file
                 )
                 // Помещаем URI в системный буфер обмена

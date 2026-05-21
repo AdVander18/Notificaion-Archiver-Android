@@ -57,4 +57,8 @@ class NotificationRepository(
     fun deleteAll() = db.deleteAllNotifications()
     fun removeAllImages() = db.removeAllImages()
     fun getStatistics() = db.getStatistics()
+
+    fun searchNotifications(query: String): List<NotificationDatabaseHelper.NotificationEntry> {
+        return db.searchNotifications(query)
+    }
 }

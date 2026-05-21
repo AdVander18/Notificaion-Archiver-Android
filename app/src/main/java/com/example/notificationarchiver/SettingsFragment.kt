@@ -1,49 +1,54 @@
 package com.example.notificationarchiver
 
 import android.Manifest
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
-import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.example.notificationarchiver.databinding.ActivitySettingsBinding
 import com.google.android.material.color.DynamicColors
 
-class SettingsActivity : AppCompatActivity() {
-    private lateinit var binding: ActivitySettingsBinding
+class SettingsFragment : Fragment() {
+
+    private var _binding: ActivitySettingsBinding? = null
+    private val binding get() = _binding!!
     private lateinit var viewModel: SettingsViewModel
     private var popupWindow: PopupWindow? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        binding = ActivitySettingsBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        binding.toolbar.setNavigationOnClickListener { onBackPressed() }
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = ActivitySettingsBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.mainContainer)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        viewModel = ViewModelProvider(requireActivity())[SettingsViewModel::class.java]
+
+        // Настройка тулбара
+        binding.toolbar.setNavigationOnClickListener {
+            (activity as? MainActivity)?.closeSettingsPanel()
         }
 
-        viewModel = ViewModelProvider(this)[SettingsViewModel::class.java]
-
+        // Все остальные настройки идентичны SettingsActivity
         binding.switchDisableDuplicateNotifications.isChecked = viewModel.preferences.disableDuplicateNotifications
         binding.switchDisableDuplicateNotifications.setOnCheckedChangeListener { _, checked ->
             viewModel.preferences.disableDuplicateNotifications = checked
@@ -71,36 +76,29 @@ class SettingsActivity : AppCompatActivity() {
                 viewModel.preferences.maxNotificationDays = maxDays
                 viewModel.applyDayLimit(maxDays)
             }
-            Toast.makeText(this, "Сохранено", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Сохранено", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnManageIgnoredApps.setOnClickListener {
-            startActivity(Intent(this, IgnoredAppsActivity::class.java))
+            startActivity(Intent(requireContext(), IgnoredAppsActivity::class.java))
         }
-
         binding.btnManageIgnoredImages.setOnClickListener {
-            startActivity(Intent(this, IgnoredImagesActivity::class.java))
+            startActivity(Intent(requireContext(), IgnoredImagesActivity::class.java))
         }
-
         binding.btnManageArchiveOnlyApps.setOnClickListener {
-            startActivity(Intent(this, ArchiveOnlyAppsActivity::class.java))
+            startActivity(Intent(requireContext(), ArchiveOnlyAppsActivity::class.java))
         }
 
-        // Новый обработчик для строки выбора подтверждений
-        binding.rowSkipConfirmation.setOnClickListener {
-            showSkipDropdown(it)
-        }
-
-        // Обновляем текст строки при запуске
+        binding.rowSkipConfirmation.setOnClickListener { showSkipDropdown(it) }
         updateSkipText()
 
         binding.btnDeleteAllNotifications.setOnClickListener {
-            AlertDialog.Builder(this)
+            AlertDialog.Builder(requireContext())
                 .setTitle("Удаление")
                 .setMessage("Удалить все уведомления?")
                 .setPositiveButton("Удалить") { _, _ ->
                     viewModel.deleteAllNotifications()
-                    Toast.makeText(this, "Удалено", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Удалено", Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("Отмена", null)
                 .show()
@@ -126,18 +124,18 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         binding.btnDeleteAllImages.setOnClickListener {
-            AlertDialog.Builder(this)
+            AlertDialog.Builder(requireContext())
                 .setTitle("Удаление")
                 .setMessage("Удалить все изображения?")
                 .setPositiveButton("Удалить") { _, _ ->
                     viewModel.deleteAllImages()
-                    Toast.makeText(this, "Удалено", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Удалено", Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton("Отмена", null)
                 .show()
         }
 
-        viewModel.statistics.observe(this) { stats ->
+        viewModel.statistics.observe(viewLifecycleOwner) { stats ->
             binding.tvTotalNotifications.text = stats.totalNotifications.toString()
             binding.tvNotifications24h.text = stats.notificationsLast24h.toString()
             binding.tvNotificationsMemory.text = formatBytes(stats.textMemoryBytes)
@@ -147,27 +145,23 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.btnTestNotification.setOnClickListener {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
             ) {
                 sendTestNotification()
             } else {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
         binding.btnBatteryOptimization.setOnClickListener { requestBatteryOptimization() }
         binding.textVersion.text = getAppVersion()
     }
 
-    /**
-     * Показывает выпадающий список с чекбоксами для настройки пропуска подтверждений.
-     */
     private fun showSkipDropdown(anchorView: View) {
         if (popupWindow?.isShowing == true) {
             popupWindow?.dismiss()
             return
         }
-
-        val inflater = LayoutInflater.from(this)
+        val inflater = LayoutInflater.from(requireContext())
         val popupView = inflater.inflate(R.layout.popup_skip_confirmation, null)
 
         val cbDelete = popupView.findViewById<CheckBox>(R.id.cbPopupDeleteNotifications)
@@ -175,13 +169,11 @@ class SettingsActivity : AppCompatActivity() {
         val cbImages = popupView.findViewById<CheckBox>(R.id.cbPopupDeleteImages)
         val cbIgnoreImages = popupView.findViewById<CheckBox>(R.id.cbPopupIgnoreImages)
 
-        // Устанавливаем текущие состояния
         cbDelete.isChecked = viewModel.preferences.skipDeleteNotifications
         cbIgnore.isChecked = viewModel.preferences.skipIgnoreApps
         cbImages.isChecked = viewModel.preferences.skipDeleteImages
         cbIgnoreImages.isChecked = viewModel.preferences.skipIgnoreImages
 
-        // Слушатели изменений
         val checkedChangeListener = { _: Any? ->
             viewModel.preferences.skipDeleteNotifications = cbDelete.isChecked
             viewModel.preferences.skipIgnoreApps = cbIgnore.isChecked
@@ -189,7 +181,6 @@ class SettingsActivity : AppCompatActivity() {
             viewModel.preferences.skipIgnoreImages = cbIgnoreImages.isChecked
             updateSkipText()
         }
-
         cbDelete.setOnCheckedChangeListener { _, _ -> checkedChangeListener(null) }
         cbIgnore.setOnCheckedChangeListener { _, _ -> checkedChangeListener(null) }
         cbImages.setOnCheckedChangeListener { _, _ -> checkedChangeListener(null) }
@@ -210,7 +201,6 @@ class SettingsActivity : AppCompatActivity() {
     private fun updateSkipText() {
         val prefs = viewModel.preferences
         val selected = mutableListOf<String>()
-
         if (prefs.skipDeleteNotifications) selected.add("Удаления уведомлений")
         if (prefs.skipIgnoreApps) selected.add("Игнора приложений")
         if (prefs.skipDeleteImages) selected.add("Удаления изображений")
@@ -244,40 +234,27 @@ class SettingsActivity : AppCompatActivity() {
         }
         if (AppCompatDelegate.getDefaultNightMode() != nightMode) {
             AppCompatDelegate.setDefaultNightMode(nightMode)
-            // Перезапускаем активность, чтобы тема применилась сразу
-            val intent = intent
-            finish()
-            startActivity(intent)
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+            activity?.recreate()
         }
     }
 
     private fun sendTestNotification() {
+        // ваш код sendTestNotification (без изменений)
         val channelId = "test_channel"
-        val channelName = "Тестовые уведомления"
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = android.app.NotificationChannel(
-                channelId,
-                channelName,
+                channelId, "Тестовые уведомления",
                 android.app.NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Канал для проверки работы архиватора"
-            }
-            val manager = getSystemService(android.app.NotificationManager::class.java)
+            ).apply { description = "Канал для проверки" }
+            val manager = requireContext().getSystemService(android.app.NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
-
-        // Загружаем изображение (стандартная иконка Android)
-        val largeIcon = android.graphics.BitmapFactory.decodeResource(
-            resources,
-            R.drawable.testnotification
-        )
-
-        val notification = androidx.core.app.NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+        val largeIcon = android.graphics.BitmapFactory.decodeResource(resources, R.drawable.testnotification)
+        val notification = androidx.core.app.NotificationCompat.Builder(requireContext(), channelId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Неправильный ответ не означает бессмысленности.")
-            .setContentText("Эта фраза утверждает, что ошибочный ответ может сохранять смысловую ценность," +
-                    "отражая определённую логику, этап познания или нестандартный взгляд на проблему." +
+            .setContentText("Эта фраза утверждает, что ошибочный ответ может сохранять смысловую ценность, " +
+                    "отражая определённую логику, этап познания или нестандартный взгляд на проблему. " +
                     "Она подчёркивает, что правильность и осмысленность не тождественны, и даже заблуждение способно стимулировать дальнейший поиск истины.")
             .setLargeIcon(largeIcon)
             .setStyle(
@@ -288,42 +265,42 @@ class SettingsActivity : AppCompatActivity() {
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
-
-        val manager = getSystemService(android.app.NotificationManager::class.java)
+        val manager = requireContext().getSystemService(android.app.NotificationManager::class.java)
         manager.notify(999, notification)
-        Toast.makeText(this, "Тестовое уведомление отправлено", Toast.LENGTH_SHORT).show()
+        Toast.makeText(requireContext(), "Тестовое уведомление отправлено", Toast.LENGTH_SHORT).show()
     }
 
     private fun requestBatteryOptimization() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            val powerManager = getSystemService(android.os.PowerManager::class.java)
-            if (powerManager?.isIgnoringBatteryOptimizations(packageName) == true) {
-                Toast.makeText(this, "Оптимизация батареи уже отключена", Toast.LENGTH_SHORT).show()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = requireContext().getSystemService(android.os.PowerManager::class.java)
+            if (powerManager?.isIgnoringBatteryOptimizations(requireContext().packageName) == true) {
+                Toast.makeText(requireContext(), "Оптимизация батареи уже отключена", Toast.LENGTH_SHORT).show()
             } else {
-                // Надёжный способ — открыть системные настройки батареи для всех приложений
-                val intent = android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                startActivity(intent)
+                startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             }
         } else {
-            Toast.makeText(this, "Не требуется на данном устройстве", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Не требуется", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun getAppVersion(): String {
         return try {
-            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            val pInfo = requireContext().packageManager.getPackageInfo(requireContext().packageName, 0)
             "Версия ${pInfo.versionName ?: "—"} (${pInfo.versionCode})"
         } catch (e: Exception) {
             "Версия неизвестна"
         }
     }
 
-    private val requestNotificationPermissionLauncher =
+    private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                sendTestNotification()    // Повторно вызываем отправку после получения разрешения
-            } else {
-                Toast.makeText(this, "Разрешение на уведомления не предоставлено", Toast.LENGTH_SHORT).show()
-            }
+            if (granted) sendTestNotification()
+            else Toast.makeText(requireContext(), "Разрешение на уведомления не предоставлено", Toast.LENGTH_SHORT).show()
         }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        popupWindow?.dismiss()
+        _binding = null
+    }
 }

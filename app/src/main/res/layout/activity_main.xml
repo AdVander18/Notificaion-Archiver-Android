@@ -1,46 +1,107 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<com.example.notificationarchiver.SwipeToSettingsLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/mainContainer"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    android:background="?attr/colorSurface">
+    android:layout_height="match_parent">
 
-    <com.google.android.material.appbar.AppBarLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        app:elevation="0dp">
-
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/topAppBar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            app:title="Архив уведомлений"
-            app:navigationIcon="@drawable/ic_settings"
-            style="@style/Widget.Material3.Toolbar.Surface" />
-
-    </com.google.android.material.appbar.AppBarLayout>
-
-    <!-- Контент с автоматическим отступом под AppBarLayout -->
-    <LinearLayout
+    <!-- Основной экран -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:id="@+id/mainContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:fitsSystemWindows="true"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:background="?attr/colorSurface">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/notificationRecyclerView"
+        <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="12dp"
-            android:clipToPadding="false"
-            android:paddingBottom="16dp" />
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            app:elevation="0dp">
 
-    </LinearLayout>
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/topAppBar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                app:title="Архив уведомлений"
+                app:navigationIcon="@drawable/ic_settings"
+                app:navigationContentDescription="Настройки"
+                style="@style/Widget.Material3.Toolbar.Surface" />
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Панель поиска (выезжает сверху) -->
+        <LinearLayout
+            android:id="@+id/searchPanel"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="?attr/actionBarSize"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="?attr/colorSurface"
+            android:elevation="4dp"
+            android:paddingHorizontal="8dp"
+            android:visibility="gone"
+            android:translationY="-48dp"
+            tools:visibility="visible"
+            tools:translationY="0dp">
+
+            <!-- Иконка поиска (декоративная) -->
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginHorizontal="8dp"
+                android:src="@android:drawable/ic_menu_search"
+                android:contentDescription="Поиск" />
+
+            <!-- Поле ввода -->
+            <EditText
+                android:id="@+id/searchEditText"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="Поиск по приложениям"
+                android:inputType="text"
+                android:maxLines="1" />
+
+            <!-- Крестик для очистки текста -->
+            <ImageView
+                android:id="@+id/searchClearButton"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginHorizontal="8dp"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:contentDescription="Очистить" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/notificationRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="12dp"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp" />
+
+        </LinearLayout>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <!-- Контейнер для настроек (будет выезжать) -->
+    <FrameLayout
+        android:id="@+id/settingsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/colorSurface" />
+
+</com.example.notificationarchiver.SwipeToSettingsLayout>

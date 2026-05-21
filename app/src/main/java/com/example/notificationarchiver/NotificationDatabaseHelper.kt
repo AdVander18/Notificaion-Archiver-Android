@@ -188,4 +188,10 @@ class NotificationDatabaseHelper(context: Context) :
 
         return Statistics(total, recent, textMem, imageMem)
     }
+
+    fun searchNotifications(query: String): List<NotificationEntry> {
+        val selection = "title LIKE ? OR text LIKE ? OR package_name LIKE ?"
+        val args = arrayOf("%$query%", "%$query%", "%$query%")
+        return query(selection, args) // использует существующий private fun query()
+    }
 }
