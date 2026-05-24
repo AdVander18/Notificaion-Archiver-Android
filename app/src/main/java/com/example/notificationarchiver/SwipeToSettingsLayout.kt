@@ -21,6 +21,7 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
     private var tracking = false
     private var initialTranslationX = 0f
     private val touchSlop: Int = ViewConfiguration.get(context).scaledTouchSlop
+    private var openAnimationEnabled = true
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -107,11 +108,21 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
         return false
     }
 
+    fun setOpenAnimationEnabled(enabled: Boolean) {
+        openAnimationEnabled = enabled
+    }
+
     private fun animateToOpen() {
-        settingsView?.animate()
-            ?.translationX(0f)
-            ?.withEndAction { isOpen = true }
-            ?.start()
+        if (openAnimationEnabled) {
+            settingsView?.animate()
+                ?.translationX(0f)
+                ?.withEndAction { isOpen = true }
+                ?.start()
+        } else {
+            // Прямая установка без вызова openPanel()
+            settingsView?.translationX = 0f
+            isOpen = true
+        }
     }
 
     private fun animateToClosed() {

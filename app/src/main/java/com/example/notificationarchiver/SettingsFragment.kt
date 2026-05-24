@@ -1,25 +1,35 @@
 package com.example.notificationarchiver
 
 import android.Manifest
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import com.example.notificationarchiver.databinding.ActivitySettingsBinding
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.color.DynamicColors
 
 class SettingsFragment : Fragment() {
@@ -28,6 +38,34 @@ class SettingsFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var viewModel: SettingsViewModel
     private var popupWindow: PopupWindow? = null
+
+    // Защита от повторных анимаций
+    private var isThemeAnimating = false
+    private var themeChangeAnimator: ValueAnimator? = null
+    private var pendingMode: String? = null
+
+    private val themeToggleListener =
+        MaterialButtonToggleGroup.OnButtonCheckedListener { group, checkedId, isChecked ->
+            if (isChecked) {
+                val newMode = when (checkedId) {
+                    binding.btnThemeLight.id -> "light"
+                    binding.btnThemeDark.id -> "dark"
+                    else -> "auto"
+                }
+
+                // Игнорируем, если это тот же режим, что уже установлен
+                if (newMode == viewModel.preferences.themeMode) return@OnButtonCheckedListener
+
+                if (isThemeAnimating) {
+                    // Запомним, что хотели переключиться на этот режим после окончания текущей анимации
+                    pendingMode = newMode
+                    return@OnButtonCheckedListener
+                }
+
+                val clickedButton = group.findViewById<View>(checkedId)
+                animateThemeSwitch(newMode, clickedButton ?: group)
+            }
+        }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -110,15 +148,17 @@ class SettingsFragment : Fragment() {
                 "dark"  -> check(binding.btnThemeDark.id)
                 else    -> check(binding.btnThemeAuto.id)
             }
-            addOnButtonCheckedListener { _, checkedId, isChecked ->
+            binding.toggleThemeGroup.addOnButtonCheckedListener { group, checkedId, isChecked ->
                 if (isChecked) {
                     val newMode = when (checkedId) {
                         binding.btnThemeLight.id -> "light"
                         binding.btnThemeDark.id  -> "dark"
                         else                     -> "auto"
                     }
-                    viewModel.preferences.themeMode = newMode
-                    applyThemeMode(newMode)
+                    if (newMode == viewModel.preferences.themeMode) return@addOnButtonCheckedListener
+                    if (isThemeAnimating) return@addOnButtonCheckedListener
+                    val clickedButton = group.findViewById<View>(checkedId)
+                    animateThemeSwitch(newMode, clickedButton ?: group)
                 }
             }
         }
@@ -154,6 +194,14 @@ class SettingsFragment : Fragment() {
         }
         binding.btnBatteryOptimization.setOnClickListener { requestBatteryOptimization() }
         binding.textVersion.text = getAppVersion()
+        val currentMode = viewModel.preferences.themeMode
+        binding.toggleThemeGroup.removeOnButtonCheckedListener(themeToggleListener)
+        when (currentMode) {
+            "light" -> binding.toggleThemeGroup.check(binding.btnThemeLight.id)
+            "dark"  -> binding.toggleThemeGroup.check(binding.btnThemeDark.id)
+            else    -> binding.toggleThemeGroup.check(binding.btnThemeAuto.id)
+        }
+        binding.toggleThemeGroup.addOnButtonCheckedListener(themeToggleListener)
     }
 
     private fun showSkipDropdown(anchorView: View) {
@@ -226,20 +274,139 @@ class SettingsFragment : Fragment() {
         return "%.1f %s".format(size, units[idx])
     }
 
-    private fun applyThemeMode(mode: String) {
-        val nightMode = when (mode) {
-            "light" -> AppCompatDelegate.MODE_NIGHT_NO
-            "dark"  -> AppCompatDelegate.MODE_NIGHT_YES
-            else    -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-        }
-        if (AppCompatDelegate.getDefaultNightMode() != nightMode) {
-            AppCompatDelegate.setDefaultNightMode(nightMode)
-            activity?.recreate()
+    private fun animateThemeSwitch(newMode: String, clickedView: View) {
+        val activity = activity ?: return
+        val decorView = activity.window.decorView as ViewGroup
+
+        // Отменяем предыдущую анимацию
+        themeChangeAnimator?.cancel()
+        isThemeAnimating = true
+
+        // Координаты центра кнопки
+        val location = IntArray(2)
+        clickedView.getLocationOnScreen(location)
+        val centerX = location[0] + clickedView.width / 2f
+        val centerY = location[1] + clickedView.height / 2f
+
+        val oldSystemUiFlags = decorView.systemUiVisibility
+        decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                )
+
+        decorView.post {
+            val oldBitmap = captureFullScreen(decorView)
+
+            val fakeNewColor = when (newMode) {
+                "dark" -> Color.BLACK
+                "light" -> Color.WHITE
+                else -> {
+                    val nightModeFlags = resources.configuration.uiMode and
+                            android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                    if (nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES) Color.BLACK
+                    else Color.WHITE
+                }
+            }
+
+            val metrics = resources.displayMetrics
+            val maxRadius = Math.hypot(metrics.widthPixels.toDouble(), metrics.heightPixels.toDouble()).toFloat()
+
+            val revealView = FakeThemeRevealView(activity)
+            revealView.setRevealData(oldBitmap, centerX, centerY, fakeNewColor)
+            decorView.addView(revealView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+
+            val animator = ValueAnimator.ofFloat(0f, maxRadius).apply {
+                duration = 500
+                interpolator = AccelerateDecelerateInterpolator()
+                addUpdateListener { anim ->
+                    revealView.radius = anim.animatedValue as Float
+                }
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        // Убираем анимированный слой
+                        decorView.removeView(revealView)
+                        decorView.systemUiVisibility = oldSystemUiFlags
+
+                        // Сохраняем выбранную тему
+                        viewModel.preferences.themeMode = newMode
+                        AppCompatDelegate.setDefaultNightMode(nightModeFromString(newMode))
+
+                        isThemeAnimating = false
+                        themeChangeAnimator = null
+
+                        // Если за время анимации поступил новый запрос, запускаем его
+                        val pending = pendingMode
+                        pendingMode = null
+                        if (pending != null && pending != newMode) {
+                            // Небольшая задержка, чтобы recreate() завершился, и запускаем следующую анимацию
+                            activity.recreate()
+                            // Но это сложно: здесь нужен другой механизм.
+                            // Упростим: просто запустим новую анимацию после небольшой паузы.
+                            decorView.postDelayed({
+                                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                                    animateThemeSwitch(pending, clickedView)
+                                }
+                            }, 100)
+                        } else {
+                            activity.recreate()
+                        }
+                    }
+
+                    override fun onAnimationCancel(animation: Animator) {
+                        decorView.removeView(revealView)
+                        decorView.systemUiVisibility = oldSystemUiFlags
+                        isThemeAnimating = false
+                        themeChangeAnimator = null
+                    }
+                })
+            }
+
+            themeChangeAnimator = animator
+            animator.start()
         }
     }
 
+    private fun captureFullScreen(view: View): Bitmap {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        return bitmap
+    }
+
+    private fun applyThemeWithoutRecreate(mode: String) {
+        val nightMode = nightModeFromString(mode)
+        // Для текущей Activity – принудительная смена без пересоздания
+        (requireActivity() as AppCompatActivity).delegate.localNightMode = nightMode
+        // Глобально – для новых Activity
+        AppCompatDelegate.setDefaultNightMode(nightMode)
+        // Заставляем перерисовать корневой view
+        requireActivity().window.decorView.apply {
+            invalidate()
+            requestLayout()
+        }
+    }
+
+    private fun waitForLayout(view: View, onReady: () -> Unit) {
+        if (view.isLaidOut && view.width > 0 && view.height > 0) {
+            // Дополнительный кадр для стабилизации
+            view.post { onReady() }
+        } else {
+            view.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    view.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    view.post { onReady() }
+                }
+            })
+        }
+    }
+
+    private fun nightModeFromString(mode: String): Int = when (mode) {
+        "light" -> AppCompatDelegate.MODE_NIGHT_NO
+        "dark"  -> AppCompatDelegate.MODE_NIGHT_YES
+        else    -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+    }
+
     private fun sendTestNotification() {
-        // ваш код sendTestNotification (без изменений)
         val channelId = "test_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = android.app.NotificationChannel(

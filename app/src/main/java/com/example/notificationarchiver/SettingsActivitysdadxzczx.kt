@@ -22,9 +22,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import com.example.notificationarchiver.databinding.ActivitySettingsBinding
-import com.google.android.material.color.DynamicColors
 
-class SettingsActivity : AppCompatActivity() {
+class SettingsActivitysdadxzczx : AppCompatActivity() {
     private lateinit var binding: ActivitySettingsBinding
     private lateinit var viewModel: SettingsViewModel
     private var popupWindow: PopupWindow? = null

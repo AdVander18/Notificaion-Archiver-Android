@@ -1,8 +1,5 @@
 package com.example.notificationarchiver
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ValueAnimator
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -13,8 +10,6 @@ import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.activity.BackEventCompat
-import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import com.example.notificationarchiver.databinding.ActivityIgnoredAppsBinding
@@ -26,20 +21,10 @@ class IgnoredAppsActivity : AppCompatActivity() {
 
     private var firstLoadDone = false
 
-    // Обработчик предсказывающего жеста «назад»
-    private val backPressedCallback = object : OnBackPressedCallback(true) {
-        override fun handleOnBackPressed() {
-            animateAndFinish()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityIgnoredAppsBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        // Регистрируем callback для жеста «назад»
-        onBackPressedDispatcher.addCallback(this, backPressedCallback)
 
         viewModel = ViewModelProvider(this)[IgnoredAppsViewModel::class.java]
 
@@ -65,8 +50,9 @@ class IgnoredAppsActivity : AppCompatActivity() {
             }
         }
 
+        // Кнопка «Назад» в тулбаре — теперь просто finish()
         binding.buttonBack.setOnClickListener {
-            animateAndFinish()
+            finish()
         }
 
         binding.editTextSearch.addTextChangedListener(object : TextWatcher {
@@ -77,46 +63,31 @@ class IgnoredAppsActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
     }
-
-    private fun animateAndFinish() {
-        val targetX = binding.root.width.toFloat()
-        ValueAnimator.ofFloat(binding.root.translationX, targetX).apply {
-            duration = 250L
-            addUpdateListener { binding.root.translationX = it.animatedValue as Float }
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    finish()
-                    overridePendingTransition(0, 0)
-                }
-            })
-            start()
-        }
-    }
 }
 
-    class IgnoredAppAdapter(
-        context: AppCompatActivity,
-        private val viewModel: IgnoredAppsViewModel
-    ) : ArrayAdapter<IgnoredAppsViewModel.AppInfo>(context, R.layout.item_ignored_app) {
+class IgnoredAppAdapter(
+    context: AppCompatActivity,
+    private val viewModel: IgnoredAppsViewModel
+) : ArrayAdapter<IgnoredAppsViewModel.AppInfo>(context, R.layout.item_ignored_app) {
 
-        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-            val view = convertView ?: LayoutInflater.from(context)
-                .inflate(R.layout.item_ignored_app, parent, false)
+    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+        val view = convertView ?: LayoutInflater.from(context)
+            .inflate(R.layout.item_ignored_app, parent, false)
 
-            val app = getItem(position) ?: return view
+        val app = getItem(position) ?: return view
 
-            val iconView = view.findViewById<ImageView>(R.id.imageAppIcon)
-            val textView = view.findViewById<TextView>(R.id.textAppName)
-            val checkBox = view.findViewById<CheckBox>(R.id.checkboxIgnoreApp)
+        val iconView = view.findViewById<ImageView>(R.id.imageAppIcon)
+        val textView = view.findViewById<TextView>(R.id.textAppName)
+        val checkBox = view.findViewById<CheckBox>(R.id.checkboxIgnoreApp)
 
-            iconView.setImageDrawable(context.packageManager.getApplicationIcon(app.packageName))
-            textView.text = app.appName
+        iconView.setImageDrawable(context.packageManager.getApplicationIcon(app.packageName))
+        textView.text = app.appName
 
-            checkBox.setOnCheckedChangeListener(null)
-            checkBox.isChecked = viewModel.isIgnored(app.packageName)
-            checkBox.setOnCheckedChangeListener { _, checked ->
-                viewModel.toggleIgnored(app.packageName, checked)
-            }
-            return view
+        checkBox.setOnCheckedChangeListener(null)
+        checkBox.isChecked = viewModel.isIgnored(app.packageName)
+        checkBox.setOnCheckedChangeListener { _, checked ->
+            viewModel.toggleIgnored(app.packageName, checked)
         }
+        return view
     }
+}

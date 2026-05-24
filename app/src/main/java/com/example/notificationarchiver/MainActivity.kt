@@ -17,6 +17,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.notificationarchiver.databinding.ActivityMainBinding
@@ -78,13 +79,12 @@ class MainActivity : AppCompatActivity() {
             R.layout.item_notification,
             emptyList(),
             onItemClick = { entry ->
-                // Открываем приложение-источник уведомления
                 val intent = packageManager.getLaunchIntentForPackage(entry.packageName)
                 if (intent != null) startActivity(intent)
                 else Toast.makeText(this, "Не удалось открыть приложение", Toast.LENGTH_SHORT).show()
             },
             onItemLongClick = { entry ->
-                showNotificationContextMenu(entry)
+                askNavigateToNotification(entry)
                 true
             }
         )
@@ -117,6 +117,21 @@ class MainActivity : AppCompatActivity() {
         checkNotificationPermission()
         if (!isNotificationListenerEnabled()) {
             showPermissionRequestDialog()
+        }
+
+        // Проверяем флаг восстановления панели настроек
+        if (intent.getBooleanExtra("open_settings_after_recreate", false)) {
+            intent.removeExtra("open_settings_after_recreate")
+
+            // Отключаем анимацию открытия панели
+            swipeLayout.setOpenAnimationEnabled(false)
+
+            window.decorView.setBackgroundColor(
+                ContextCompat.getColor(this, R.color.settings_background)
+            )
+
+            // Открываем панель немедленно
+            swipeLayout.post { swipeLayout.openPanel() }
         }
 
         initSearchPanel()
@@ -196,10 +211,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun dpToPx(dp: Float): Float = dp * resources.displayMetrics.density
 
-    // === Меню ===
-
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+
+        // Получаем цвет из темы правильно
+        val colorOnSurface = com.google.android.material.color.MaterialColors.getColor(
+            this,
+            com.google.android.material.R.attr.colorOnSurface,
+            "colorOnSurface"
+        )
+
+        menu?.findItem(R.id.action_search)?.icon?.setTint(colorOnSurface)
+
         return true
     }
 
@@ -213,29 +236,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // === Контекстное меню для уведомления (поисковый режим) ===
-
-    private fun showNotificationContextMenu(entry: NotificationDatabaseHelper.NotificationEntry) {
+    private fun askNavigateToNotification(entry: NotificationDatabaseHelper.NotificationEntry) {
         AlertDialog.Builder(this)
-            .setTitle("Действия с уведомлением")
-            .setItems(arrayOf("Удалить уведомление")) { _, _ ->
-                ConfirmationHelper.confirmIfNeeded(
-                    this,
-                    viewModel.preferences.skipDeleteNotifications,
-                    "Удалить уведомление",
-                    "Удалить это уведомление?"
-                ) {
-                    viewModel.deleteNotification(entry.id)
-                    // После удаления перезапускаем поиск, чтобы обновить список
-                    val currentQuery = searchEditText.text.toString()
-                    if (currentQuery.isNotEmpty()) {
-                        viewModel.searchNotifications(currentQuery)
-                    }
-                    Toast.makeText(this, "Уведомление удалено", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Отмена", null)
+            .setMessage("Перейти на это уведомление?")
+            .setPositiveButton("Да") { _, _ -> navigateToNotification(entry) }
+            .setNegativeButton("Нет", null)
             .show()
+    }
+
+    private fun navigateToNotification(entry: NotificationDatabaseHelper.NotificationEntry) {
+        val intent = Intent(this, NotificationHistoryActivity::class.java).apply {
+            putExtra("packageName", entry.packageName)
+            putExtra("highlight_notification_id", entry.id)
+        }
+        startActivity(intent)
     }
 
     fun closeSettingsPanel() {

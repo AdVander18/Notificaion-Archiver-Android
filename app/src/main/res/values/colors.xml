@@ -17,4 +17,6 @@
 
     <color name="m3_error">#B3261E</color>
     <color name="m3_on_error">#FFFFFF</color>
+
+    <color name="settings_background">#FFFFFF</color>
 </resources>

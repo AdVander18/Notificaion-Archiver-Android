@@ -1,21 +1,27 @@
 package com.example.notificationarchiver
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.notificationarchiver.databinding.ActivityNotificationHistoryBinding
 import com.google.android.material.color.DynamicColors
-import com.example.notificationarchiver.BuildConfig
 import java.io.File
 
 class NotificationHistoryActivity : AppCompatActivity() {
@@ -23,6 +29,7 @@ class NotificationHistoryActivity : AppCompatActivity() {
     private lateinit var viewModel: NotificationHistoryViewModel
     private lateinit var adapter: NotificationAdapter
     private var packageName: String? = null
+    private var highlightNotificationId: Long = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         DynamicColors.applyToActivitiesIfAvailable(application)
@@ -40,6 +47,7 @@ class NotificationHistoryActivity : AppCompatActivity() {
 
         viewModel = ViewModelProvider(this)[NotificationHistoryViewModel::class.java]
         packageName = intent.getStringExtra("packageName")
+        highlightNotificationId = intent.getLongExtra("highlight_notification_id", -1L)
 
         val appName = packageName?.let { pkg ->
             try {
@@ -47,7 +55,6 @@ class NotificationHistoryActivity : AppCompatActivity() {
                 packageManager.getApplicationLabel(appInfo).toString()
             } catch (e: PackageManager.NameNotFoundException) { pkg }
         } ?: "История уведомлений"
-        // Используем Toolbar вместо отдельного TextView
         binding.toolbar.title = "Уведомления от $appName"
 
         binding.historyRecyclerView.layoutManager = LinearLayoutManager(this)
@@ -60,7 +67,6 @@ class NotificationHistoryActivity : AppCompatActivity() {
                 true
             },
             onItemClick = { entry ->
-                // Открываем приложение-источник только если это история одного приложения
                 if (packageName != null) {
                     val intent = packageManager.getLaunchIntentForPackage(entry.packageName)
                     if (intent != null) {
@@ -75,6 +81,11 @@ class NotificationHistoryActivity : AppCompatActivity() {
 
         viewModel.notifications.observe(this) { list ->
             adapter.updateData(list)
+            // Если нужно подсветить уведомление и список загружен
+            if (highlightNotificationId != -1L) {
+                performScrollAndHighlight(list)
+                highlightNotificationId = -1L // однократно
+            }
         }
         viewModel.loadNotifications(packageName)
 
@@ -88,6 +99,64 @@ class NotificationHistoryActivity : AppCompatActivity() {
         } else {
             binding.openAppFab.hide()
         }
+    }
+
+    private fun performScrollAndHighlight(list: List<NotificationDatabaseHelper.NotificationEntry>) {
+        val pos = list.indexOfFirst { it.id == highlightNotificationId }
+        if (pos == -1) return
+
+        val recyclerView = binding.historyRecyclerView
+        // Плавная прокрутка к элементу
+        recyclerView.smoothScrollToPosition(pos)
+
+        // После остановки скролла центрируем (если нужно) и подсвечиваем
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    rv.removeOnScrollListener(this)
+                    val layoutManager = rv.layoutManager as LinearLayoutManager
+                    val firstVisible = layoutManager.findFirstCompletelyVisibleItemPosition()
+                    val lastVisible = layoutManager.findLastCompletelyVisibleItemPosition()
+
+                    if (pos in firstVisible..lastVisible) {
+                        // Элемент уже виден полностью – просто подсветка
+                        val vh = rv.findViewHolderForAdapterPosition(pos)
+                        vh?.itemView?.let { highlightView(it) }
+                    } else {
+                        // Элемент не в зоне полной видимости – доводим до центра
+                        rv.post {
+                            val vh = rv.findViewHolderForAdapterPosition(pos)
+                            if (vh != null) {
+                                val itemHeight = vh.itemView.height
+                                if (itemHeight > 0) {
+                                    val offset = (rv.height / 2) - (itemHeight / 2)
+                                    layoutManager.scrollToPositionWithOffset(pos, offset)
+                                }
+                                highlightView(vh.itemView)
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    private fun highlightView(view: android.view.View) {
+        val originalBg = view.background
+        val startColor = 0x6635B5E8  // полупрозрачный голубой
+        val endColor = Color.TRANSPARENT
+
+        val colorAnim = ValueAnimator.ofArgb(startColor, endColor)
+        colorAnim.addUpdateListener { animator ->
+            view.setBackgroundColor(animator.animatedValue as Int)
+        }
+        colorAnim.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                view.background = originalBg
+            }
+        })
+        colorAnim.duration = 1500
+        colorAnim.start()
     }
     private fun showNotificationMenu(entry: NotificationDatabaseHelper.NotificationEntry) {
         val items = mutableListOf<String>()
