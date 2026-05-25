@@ -11,6 +11,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -26,11 +28,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import com.example.notificationarchiver.databinding.ActivitySettingsBinding
 import com.google.android.material.button.MaterialButtonToggleGroup
-import com.google.android.material.color.DynamicColors
+import kotlin.math.hypot
 
 class SettingsFragment : Fragment() {
 
@@ -39,31 +40,45 @@ class SettingsFragment : Fragment() {
     private lateinit var viewModel: SettingsViewModel
     private var popupWindow: PopupWindow? = null
 
-    // Защита от повторных анимаций
     private var isThemeAnimating = false
     private var themeChangeAnimator: ValueAnimator? = null
     private var pendingMode: String? = null
+    private var pendingCheckedId: Int? = null
 
     private val themeToggleListener =
         MaterialButtonToggleGroup.OnButtonCheckedListener { group, checkedId, isChecked ->
-            if (isChecked) {
+            if (isChecked && !isThemeAnimating) {
                 val newMode = when (checkedId) {
                     binding.btnThemeLight.id -> "light"
                     binding.btnThemeDark.id -> "dark"
                     else -> "auto"
                 }
-
-                // Игнорируем, если это тот же режим, что уже установлен
                 if (newMode == viewModel.preferences.themeMode) return@OnButtonCheckedListener
 
-                if (isThemeAnimating) {
-                    // Запомним, что хотели переключиться на этот режим после окончания текущей анимации
-                    pendingMode = newMode
-                    return@OnButtonCheckedListener
+                // Определяем целевой цвет оверлея
+                val overlayColor = when (newMode) {
+                    "dark"  -> android.graphics.Color.BLACK
+                    "light" -> android.graphics.Color.WHITE
+                    else    -> {
+                        val night = resources.configuration.uiMode and
+                                android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                        if (night == android.content.res.Configuration.UI_MODE_NIGHT_YES)
+                            android.graphics.Color.BLACK
+                        else
+                            android.graphics.Color.WHITE
+                    }
                 }
 
-                val clickedButton = group.findViewById<View>(checkedId)
-                animateThemeSwitch(newMode, clickedButton ?: group)
+                isThemeAnimating = true
+
+                // 1. Показываем сплошной оверлей нужного цвета
+                ThemeOverlaySimplified.show(requireContext(), overlayColor)
+
+                // 2. Применяем тему и пересоздаём активити
+                viewModel.preferences.themeMode = newMode
+                AppCompatDelegate.setDefaultNightMode(nightModeFromString(newMode))
+                requireActivity().intent.putExtra("open_settings_after_recreate", true)
+                requireActivity().recreate()
             }
         }
 
@@ -76,17 +91,22 @@ class SettingsFragment : Fragment() {
         return binding.root
     }
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val hideOverlayRunnable = Runnable {
+        if (ThemeOverlaySimplified.isTransitioning) {
+            ThemeOverlaySimplified.hide()
+        }
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         viewModel = ViewModelProvider(requireActivity())[SettingsViewModel::class.java]
 
-        // Настройка тулбара
         binding.toolbar.setNavigationOnClickListener {
             (activity as? MainActivity)?.closeSettingsPanel()
         }
 
-        // Все остальные настройки идентичны SettingsActivity
         binding.switchDisableDuplicateNotifications.isChecked = viewModel.preferences.disableDuplicateNotifications
         binding.switchDisableDuplicateNotifications.setOnCheckedChangeListener { _, checked ->
             viewModel.preferences.disableDuplicateNotifications = checked
@@ -142,27 +162,6 @@ class SettingsFragment : Fragment() {
                 .show()
         }
 
-        binding.toggleThemeGroup.apply {
-            when (viewModel.preferences.themeMode) {
-                "light" -> check(binding.btnThemeLight.id)
-                "dark"  -> check(binding.btnThemeDark.id)
-                else    -> check(binding.btnThemeAuto.id)
-            }
-            binding.toggleThemeGroup.addOnButtonCheckedListener { group, checkedId, isChecked ->
-                if (isChecked) {
-                    val newMode = when (checkedId) {
-                        binding.btnThemeLight.id -> "light"
-                        binding.btnThemeDark.id  -> "dark"
-                        else                     -> "auto"
-                    }
-                    if (newMode == viewModel.preferences.themeMode) return@addOnButtonCheckedListener
-                    if (isThemeAnimating) return@addOnButtonCheckedListener
-                    val clickedButton = group.findViewById<View>(checkedId)
-                    animateThemeSwitch(newMode, clickedButton ?: group)
-                }
-            }
-        }
-
         binding.btnDeleteAllImages.setOnClickListener {
             AlertDialog.Builder(requireContext())
                 .setTitle("Удаление")
@@ -202,6 +201,14 @@ class SettingsFragment : Fragment() {
             else    -> binding.toggleThemeGroup.check(binding.btnThemeAuto.id)
         }
         binding.toggleThemeGroup.addOnButtonCheckedListener(themeToggleListener)
+
+        if (ThemeOverlaySimplified.isTransitioning) {
+            // Дожидаемся полной прорисовки вьюх
+            binding.root.post {
+                // 2 секунды паузы, затем резко убираем оверлей
+                handler.postDelayed(hideOverlayRunnable, 2000L)
+            }
+        }
     }
 
     private fun showSkipDropdown(anchorView: View) {
@@ -278,93 +285,83 @@ class SettingsFragment : Fragment() {
         val activity = activity ?: return
         val decorView = activity.window.decorView as ViewGroup
 
-        // Отменяем предыдущую анимацию
-        themeChangeAnimator?.cancel()
+        // Capture full screen screenshot of the current (old) theme
+        val bitmap = captureFullScreen(decorView)
+
+        // Get click position for the circle centre
+        val loc = IntArray(2)
+        clickedView.getLocationOnScreen(loc)
+        val cx = loc[0] + clickedView.width / 2f
+        val cy = loc[1] + clickedView.height / 2f
+
+        // Determine the target background colour (used inside the circle)
+        val newColor = when (newMode) {
+            "dark"  -> Color.BLACK
+            "light" -> Color.WHITE
+            else    -> {
+                val nightModeFlags = resources.configuration.uiMode and
+                        android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                if (nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES) Color.BLACK
+                else Color.WHITE
+            }
+        }
+
+        // 1. Create the circle‑reveal overlay and add it directly to the decor view
+        val overlayView = FakeThemeRevealView(requireContext()).apply {
+            setRevealData(bitmap, cx, cy, newColor)
+            radius = 0f // start invisible
+        }
+
+        // Cover the whole screen (including status/nav bars)
+        overlayView.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        overlayView.isClickable = false
+        overlayView.isFocusable = false
+        decorView.addView(overlayView)
+
         isThemeAnimating = true
 
-        // Координаты центра кнопки
-        val location = IntArray(2)
-        clickedView.getLocationOnScreen(location)
-        val centerX = location[0] + clickedView.width / 2f
-        val centerY = location[1] + clickedView.height / 2f
+        val maxRadius = hypot(
+            resources.displayMetrics.widthPixels.toFloat(),
+            resources.displayMetrics.heightPixels.toFloat()
+        )
 
-        val oldSystemUiFlags = decorView.systemUiVisibility
-        decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                )
-
-        decorView.post {
-            val oldBitmap = captureFullScreen(decorView)
-
-            val fakeNewColor = when (newMode) {
-                "dark" -> Color.BLACK
-                "light" -> Color.WHITE
-                else -> {
-                    val nightModeFlags = resources.configuration.uiMode and
-                            android.content.res.Configuration.UI_MODE_NIGHT_MASK
-                    if (nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES) Color.BLACK
-                    else Color.WHITE
-                }
+        // 2. Expand the circle to full screen (400 ms)
+        val expandAnimator = ValueAnimator.ofFloat(0f, maxRadius).apply {
+            duration = 400
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { anim ->
+                overlayView.radius = anim.animatedValue as Float
             }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    // 3. Hand over data to the next activity
+                    ThemeOverlayManager.pendingOverlayData = ThemeOverlayManager.OverlayData(
+                        bitmap, cx, cy, newColor
+                    )
+                    // Remove the overlay view – the activity will be recreated
+                    (overlayView.parent as? ViewGroup)?.removeView(overlayView)
 
-            val metrics = resources.displayMetrics
-            val maxRadius = Math.hypot(metrics.widthPixels.toDouble(), metrics.heightPixels.toDouble()).toFloat()
+                    // Apply theme and recreate
+                    val modeToApply = pendingMode ?: newMode
+                    pendingMode = null
+                    pendingCheckedId = null
+                    applyThemeAndRecreate(modeToApply)
 
-            val revealView = FakeThemeRevealView(activity)
-            revealView.setRevealData(oldBitmap, centerX, centerY, fakeNewColor)
-            decorView.addView(revealView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-
-            val animator = ValueAnimator.ofFloat(0f, maxRadius).apply {
-                duration = 500
-                interpolator = AccelerateDecelerateInterpolator()
-                addUpdateListener { anim ->
-                    revealView.radius = anim.animatedValue as Float
+                    isThemeAnimating = false
                 }
-                addListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        // Убираем анимированный слой
-                        decorView.removeView(revealView)
-                        decorView.systemUiVisibility = oldSystemUiFlags
 
-                        // Сохраняем выбранную тему
-                        viewModel.preferences.themeMode = newMode
-                        AppCompatDelegate.setDefaultNightMode(nightModeFromString(newMode))
-
-                        isThemeAnimating = false
-                        themeChangeAnimator = null
-
-                        // Если за время анимации поступил новый запрос, запускаем его
-                        val pending = pendingMode
-                        pendingMode = null
-                        if (pending != null && pending != newMode) {
-                            // Небольшая задержка, чтобы recreate() завершился, и запускаем следующую анимацию
-                            activity.recreate()
-                            // Но это сложно: здесь нужен другой механизм.
-                            // Упростим: просто запустим новую анимацию после небольшой паузы.
-                            decorView.postDelayed({
-                                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                                    animateThemeSwitch(pending, clickedView)
-                                }
-                            }, 100)
-                        } else {
-                            activity.recreate()
-                        }
-                    }
-
-                    override fun onAnimationCancel(animation: Animator) {
-                        decorView.removeView(revealView)
-                        decorView.systemUiVisibility = oldSystemUiFlags
-                        isThemeAnimating = false
-                        themeChangeAnimator = null
-                    }
-                })
-            }
-
-            themeChangeAnimator = animator
-            animator.start()
+                override fun onAnimationCancel(animation: Animator) {
+                    isThemeAnimating = false
+                    pendingMode = null
+                    pendingCheckedId = null
+                    (overlayView.parent as? ViewGroup)?.removeView(overlayView)
+                }
+            })
         }
+        expandAnimator.start()
     }
 
     private fun captureFullScreen(view: View): Bitmap {
@@ -373,31 +370,11 @@ class SettingsFragment : Fragment() {
         return bitmap
     }
 
-    private fun applyThemeWithoutRecreate(mode: String) {
-        val nightMode = nightModeFromString(mode)
-        // Для текущей Activity – принудительная смена без пересоздания
-        (requireActivity() as AppCompatActivity).delegate.localNightMode = nightMode
-        // Глобально – для новых Activity
-        AppCompatDelegate.setDefaultNightMode(nightMode)
-        // Заставляем перерисовать корневой view
-        requireActivity().window.decorView.apply {
-            invalidate()
-            requestLayout()
-        }
-    }
-
-    private fun waitForLayout(view: View, onReady: () -> Unit) {
-        if (view.isLaidOut && view.width > 0 && view.height > 0) {
-            // Дополнительный кадр для стабилизации
-            view.post { onReady() }
-        } else {
-            view.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    view.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                    view.post { onReady() }
-                }
-            })
-        }
+    private fun applyThemeAndRecreate(mode: String) {
+        viewModel.preferences.themeMode = mode
+        AppCompatDelegate.setDefaultNightMode(nightModeFromString(mode))
+        requireActivity().intent.putExtra("open_settings_after_recreate", true)
+        requireActivity().recreate()
     }
 
     private fun nightModeFromString(mode: String): Int = when (mode) {
@@ -466,6 +443,7 @@ class SettingsFragment : Fragment() {
         }
 
     override fun onDestroyView() {
+        handler.removeCallbacks(hideOverlayRunnable)
         super.onDestroyView()
         popupWindow?.dismiss()
         _binding = null

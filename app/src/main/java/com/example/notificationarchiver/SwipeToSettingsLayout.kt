@@ -25,14 +25,12 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
 
     override fun onFinishInflate() {
         super.onFinishInflate()
-        // Первый ребёнок – основной контент, второй – контейнер настроек
         settingsView = getChildAt(1)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         width = w
-        // Перемещаем панель настроек за левый край экрана, если она закрыта
         if (!isOpen) {
             settingsView?.translationX = -width.toFloat()
         }
@@ -46,24 +44,21 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
                 downX = ev.x
                 downY = ev.y
                 tracking = false
-                // Сначала даём дочерним элементам (RecyclerView и др.) шанс обработать касание
                 return false
             }
             MotionEvent.ACTION_MOVE -> {
-                if (tracking) return true  // уже перехватили
+                if (tracking) return true
 
                 val dx = ev.x - downX
                 val dy = ev.y - downY
 
                 if (isOpen) {
-                    // Панель открыта – перехватываем только при явном свайпе влево (закрытие)
                     if (dx < -touchSlop && Math.abs(dx) > Math.abs(dy) * 0.5f) {
                         tracking = true
                         initialTranslationX = settingsView!!.translationX
                         return true
                     }
                 } else {
-                    // Панель закрыта – перехватываем только при свайпе вправо (открытие)
                     if (dx > touchSlop && dx > Math.abs(dy) * 0.5f) {
                         tracking = true
                         initialTranslationX = settingsView!!.translationX
@@ -85,7 +80,6 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.x - downX
                 var newTranslation = initialTranslationX + dx
-                // Ограничиваем движение от -width (полностью скрыто) до 0 (полностью открыто)
                 newTranslation = newTranslation.coerceIn(-width.toFloat(), 0f)
                 settingsView!!.translationX = newTranslation
                 return true
@@ -93,13 +87,11 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 tracking = false
                 val current = settingsView!!.translationX
-                val threshold = -width / 2f  // Половина ширины – порог для завершения жеста
+                val threshold = -width / 2f
 
                 if (isOpen) {
-                    // Была открыта → закрываем, если сдвинули левее порога
                     if (current < threshold) animateToClosed() else animateToOpen()
                 } else {
-                    // Была закрыта → открываем, если сдвинули правее порога
                     if (current > threshold) animateToOpen() else animateToClosed()
                 }
                 return true
@@ -119,7 +111,6 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
                 ?.withEndAction { isOpen = true }
                 ?.start()
         } else {
-            // Прямая установка без вызова openPanel()
             settingsView?.translationX = 0f
             isOpen = true
         }
