@@ -42,8 +42,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var searchPanel: View
     private lateinit var searchEditText: android.widget.EditText
     private var isSearchPanelOpen = false
-    private var themeOverlayView: FakeThemeRevealView? = null
-    private var hasScheduledOverlayHide = false
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -155,45 +153,7 @@ class MainActivity : AppCompatActivity() {
     private fun applySavedTheme() {
         val prefs = getSharedPreferences("app_preferences", MODE_PRIVATE)
         val themeMode = prefs.getString("theme_mode", "auto") ?: "auto"
-        val nightMode = when (themeMode) {
-            "light" -> AppCompatDelegate.MODE_NIGHT_NO
-            "dark"  -> AppCompatDelegate.MODE_NIGHT_YES
-            else    -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-        }
-        AppCompatDelegate.setDefaultNightMode(nightMode)
-    }
-
-    companion object {
-        fun nightModeFromString(mode: String): Int = when (mode) {
-            "light" -> AppCompatDelegate.MODE_NIGHT_NO
-            "dark"  -> AppCompatDelegate.MODE_NIGHT_YES
-            else    -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-        }
-    }
-
-    private fun collapseThemeOverlay(onComplete: () -> Unit) {
-        val overlay = themeOverlayView ?: run {
-            onComplete()
-            return
-        }
-
-        val startRadius = overlay.radius
-        val animator = ValueAnimator.ofFloat(startRadius, 0f).apply {
-            duration = 300
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { anim ->
-                overlay.radius = anim.animatedValue as Float
-            }
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    // Remove the overlay from the view hierarchy
-                    (overlay.parent as? ViewGroup)?.removeView(overlay)
-                    themeOverlayView = null
-                    onComplete()
-                }
-            })
-        }
-        animator.start()
+        ThemeHelper.applyTheme(themeMode)
     }
 
     private fun initSearchPanel() {

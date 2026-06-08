@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">NotificationArchiver</string>
     <string name="service_name">NotificationArchiverService</string>
+    <string name="app_selection_title">AppSelection</string>
 </resources>

@@ -30,7 +30,6 @@ class SettingsFragment : Fragment() {
     private lateinit var viewModel: SettingsViewModel
     private var popupWindow: PopupWindow? = null
 
-
     private val themeToggleListener =
         MaterialButtonToggleGroup.OnButtonCheckedListener { group, checkedId, isChecked ->
             if (isChecked) {
@@ -46,7 +45,7 @@ class SettingsFragment : Fragment() {
                     .edit()
                     .putString("theme_mode", newMode)
                     .commit()
-                AppCompatDelegate.setDefaultNightMode(nightModeFromString(newMode))
+                AppCompatDelegate.setDefaultNightMode(ThemeHelper.nightModeFromString(newMode))
                 requireActivity().recreate()
             }
         }
@@ -100,13 +99,16 @@ class SettingsFragment : Fragment() {
         }
 
         binding.btnManageIgnoredApps.setOnClickListener {
-            startActivity(Intent(requireContext(), IgnoredAppsActivity::class.java))
+            startActivity(Intent(requireContext(), AppSelectionActivity::class.java)
+                .putExtra(AppSelectionActivity.EXTRA_SELECTION_TYPE, AppSelectionType.IGNORE_APPS.name))
         }
         binding.btnManageIgnoredImages.setOnClickListener {
-            startActivity(Intent(requireContext(), IgnoredImagesActivity::class.java))
+            startActivity(Intent(requireContext(), AppSelectionActivity::class.java)
+                .putExtra(AppSelectionActivity.EXTRA_SELECTION_TYPE, AppSelectionType.IGNORE_IMAGES.name))
         }
         binding.btnManageArchiveOnlyApps.setOnClickListener {
-            startActivity(Intent(requireContext(), ArchiveOnlyAppsActivity::class.java))
+            startActivity(Intent(requireContext(), AppSelectionActivity::class.java)
+                .putExtra(AppSelectionActivity.EXTRA_SELECTION_TYPE, AppSelectionType.ARCHIVE_ONLY.name))
         }
 
         binding.rowSkipConfirmation.setOnClickListener { showSkipDropdown(it) }
@@ -156,19 +158,13 @@ class SettingsFragment : Fragment() {
         binding.btnBatteryOptimization.setOnClickListener { requestBatteryOptimization() }
         binding.textVersion.text = getAppVersion()
         val currentMode = viewModel.preferences.themeMode
-        binding.toggleThemeGroup.removeOnButtonCheckedListener(themeToggleListener) // снимаем, если был
+        binding.toggleThemeGroup.removeOnButtonCheckedListener(themeToggleListener)
         when (currentMode) {
             "light" -> binding.toggleThemeGroup.check(binding.btnThemeLight.id)
             "dark"  -> binding.toggleThemeGroup.check(binding.btnThemeDark.id)
             else    -> binding.toggleThemeGroup.check(binding.btnThemeAuto.id)
         }
         binding.toggleThemeGroup.addOnButtonCheckedListener(themeToggleListener)
-
-//        if (ThemeOverlaySimplified.isTransitioning) {
-//            binding.root.post {
-//                handler.postDelayed(hideOverlayRunnable, 2000L)
-//            }
-//        }
     }
 
     private fun showSkipDropdown(anchorView: View) {
@@ -239,12 +235,6 @@ class SettingsFragment : Fragment() {
             idx++
         }
         return "%.1f %s".format(size, units[idx])
-    }
-
-    private fun nightModeFromString(mode: String): Int = when (mode) {
-        "light" -> AppCompatDelegate.MODE_NIGHT_NO
-        "dark"  -> AppCompatDelegate.MODE_NIGHT_YES
-        else    -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
     }
 
     private fun sendTestNotification() {

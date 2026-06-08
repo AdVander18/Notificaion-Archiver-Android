@@ -35,22 +35,9 @@
             android:label="История уведомлений" />
 
         <activity
-            android:name=".SettingsActivitysdadxzczx"
-            android:label="Настройки" />
-
-        <activity
-            android:name=".IgnoredAppsActivity"
-            android:label="Игнорируемые приложения"
-            android:parentActivityName=".SettingsActivitysdadxzczx" />
-
-        <activity
-            android:name=".IgnoredImagesActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ArchiveOnlyAppsActivity"
-            android:label="Скрытие уведомлений"
-            android:parentActivityName=".SettingsActivitysdadxzczx" />
+            android:name=".AppSelectionActivity"
+            android:label="@string/app_selection_title"
+            android:parentActivityName=".MainActivity" />
 
         <service
             android:name=".NotificationListener"
