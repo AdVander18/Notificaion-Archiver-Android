@@ -23,6 +23,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -49,7 +50,9 @@ class MainActivity : AppCompatActivity() {
     ) { checkNotificationPermission() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        applySavedTheme()
         super.onCreate(savedInstanceState)
+        DynamicColors.applyToActivityIfAvailable(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -65,42 +68,6 @@ class MainActivity : AppCompatActivity() {
         binding.topAppBar.navigationContentDescription = "Настройки"
 
         viewModel = ViewModelProvider(this)[MainViewModel::class.java]
-
-        // --- New: handle theme‑change overlay ---
-//        val openSettingsAfterRecreate = intent?.getBooleanExtra("open_settings_after_recreate", false) == true
-//        intent?.removeExtra("open_settings_after_recreate")
-
-//        if (openSettingsAfterRecreate && ThemeOverlayManager.pendingOverlayData != null) {
-//            // Disable the slide‑in animation of the settings panel (it opens instantly after collapse)
-//            swipeLayout.setOpenAnimationEnabled(false)
-//
-//            // Set background colour that matches the settings panel (will be revealed after collapse)
-//            window.decorView.setBackgroundColor(
-//                ContextCompat.getColor(this, R.color.settings_background)
-//            )
-//
-//            // Build a fully expanded overlay (radius = max) from the stored data
-//            val data = ThemeOverlayManager.pendingOverlayData!!
-//            val maxRadius = hypot(
-//                resources.displayMetrics.widthPixels.toFloat(),
-//                resources.displayMetrics.heightPixels.toFloat()
-//            )
-//            themeOverlayView = FakeThemeRevealView(this).apply {
-//                setRevealData(data.bitmap, data.cx, data.cy, data.newColor)
-//                radius = maxRadius
-//                isClickable = false
-//                isFocusable = false
-//            }
-//
-//            // Add on top of the entire decor view (covers status/nav bars)
-//            (window.decorView as ViewGroup).addView(
-//                themeOverlayView,
-//                ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
-//            )
-//
-//            // Clear the static reference so it’s not reused accidentally
-//            ThemeOverlayManager.pendingOverlayData = null
-//        }
 
         // Инициализация адаптеров
         packageSummaryAdapter = PackageSummaryAdapter(
@@ -139,7 +106,6 @@ class MainActivity : AppCompatActivity() {
         viewModel.packageSummaries.observe(this) { summaries ->
             if (searchEditText.text.isEmpty()) {
                 packageSummaryAdapter.updateData(summaries)
-//                tryScheduleOverlayHide()
             }
         }
         viewModel.latestNotification.observe(this) { _ ->
@@ -152,7 +118,6 @@ class MainActivity : AppCompatActivity() {
                     binding.notificationRecyclerView.adapter = searchNotificationAdapter
                 }
                 searchNotificationAdapter.updateData(notifications)
-//                tryScheduleOverlayHide()
             }
         }
 
@@ -177,35 +142,34 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        if (intent.getBooleanExtra("open_settings_after_recreate", false) && ThemeOverlaySimplified.isShown) {
-            intent.removeExtra("open_settings_after_recreate")
-            // Даём активити полностью загрузиться (дожидаемся завершения построения UI)
-            Handler(Looper.getMainLooper()).post {
-                // После того как очередь сообщений опустела, запускаем 2-секундную задержку
-                Handler(Looper.getMainLooper()).postDelayed({
-                    ThemeOverlaySimplified.hide()          // резко убираем оверлей
-                    swipeLayout.openPanel()               // открываем панель настроек
-                }, 2000)
-            }
+        if (savedInstanceState?.getBoolean("settings_open", false) == true) {
+            swipeLayout.requestOpen()
         }
     }
 
-//    private fun tryScheduleOverlayHide() {
-//        // Only act if we have a theme‑change overlay and haven't already scheduled the collapse
-//        if (themeOverlayView == null || hasScheduledOverlayHide) return
-//
-//        hasScheduledOverlayHide = true
-//        Handler(Looper.getMainLooper()).postDelayed({
-//            collapseThemeOverlay {
-//                // After the circle has shrunk and the overlay is gone:
-//                if (intent.getBooleanExtra("open_settings_after_recreate", false)) {
-//                    intent.removeExtra("open_settings_after_recreate")
-//                    // The background was already set in onCreate; just open the panel
-//                    swipeLayout.openPanel()
-//                }
-//            }
-//        }, 500)   // 0.5 s delay as requested
-//    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("settings_open", swipeLayout.isPanelOpen())
+    }
+
+    private fun applySavedTheme() {
+        val prefs = getSharedPreferences("app_preferences", MODE_PRIVATE)
+        val themeMode = prefs.getString("theme_mode", "auto") ?: "auto"
+        val nightMode = when (themeMode) {
+            "light" -> AppCompatDelegate.MODE_NIGHT_NO
+            "dark"  -> AppCompatDelegate.MODE_NIGHT_YES
+            else    -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+        AppCompatDelegate.setDefaultNightMode(nightMode)
+    }
+
+    companion object {
+        fun nightModeFromString(mode: String): Int = when (mode) {
+            "light" -> AppCompatDelegate.MODE_NIGHT_NO
+            "dark"  -> AppCompatDelegate.MODE_NIGHT_YES
+            else    -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+    }
 
     private fun collapseThemeOverlay(onComplete: () -> Unit) {
         val overlay = themeOverlayView ?: run {
@@ -231,7 +195,6 @@ class MainActivity : AppCompatActivity() {
         }
         animator.start()
     }
-    // === Поисковая панель ===
 
     private fun initSearchPanel() {
         searchPanel = binding.searchPanel
@@ -294,7 +257,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
 
-        // Получаем цвет из темы правильно
         val colorOnSurface = com.google.android.material.color.MaterialColors.getColor(
             this,
             com.google.android.material.R.attr.colorOnSurface,
@@ -441,16 +403,5 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Отмена", null)
             .show()
-    }
-
-    fun refreshMainUiForThemeChange() {
-        // Принудительно перезагружаем данные — адаптеры пересоздадут элементы с новыми цветами
-        viewModel.loadPackageSummaries()
-        // Если открыта поисковая панель, обновим и её
-        if (searchEditText.text.isNotEmpty()) {
-            viewModel.searchNotifications(searchEditText.text.toString())
-        }
-        // Фон основного контейнера тоже обновится через invalidate()
-        binding.root.invalidate()
     }
 }

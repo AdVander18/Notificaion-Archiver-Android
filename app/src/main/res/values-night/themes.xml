@@ -1,29 +1,16 @@
-<!-- res/values/themes.xml -->
-<!-- Ночная тема -->
+<!-- res/values-night/themes.xml -->
 <resources>
-    <!-- Базовая тема Material 3 без ActionBar (будем использовать тулбар) -->
+    <!-- Единая дневная/ночная тема Material 3 без ActionBar -->
     <style name="Theme.NotificationArchiver" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Цвета будут подтягиваться динамически из системы,
-             fallback-цвета оставим как резерв (например, для Android <12) -->
-        <item name="colorPrimary">@color/m3_primary</item>
-        <item name="colorOnPrimary">@color/m3_on_primary</item>
-        <item name="colorPrimaryContainer">@color/m3_primary_container</item>
-        <item name="colorOnPrimaryContainer">@color/m3_on_primary_container</item>
-        <item name="colorSecondary">@color/m3_secondary</item>
-        <item name="colorOnSecondary">@color/m3_on_secondary</item>
-        <item name="colorSecondaryContainer">@color/m3_secondary_container</item>
-        <item name="colorOnSecondaryContainer">@color/m3_on_secondary_container</item>
-        <item name="colorSurface">@color/m3_surface</item>
-        <item name="colorOnSurface">@color/m3_on_surface</item>
-        <item name="colorSurfaceVariant">@color/m3_surface_variant</item>
-        <item name="colorOnSurfaceVariant">@color/m3_on_surface_variant</item>
-        <item name="colorError">@color/m3_error</item>
-        <item name="colorOnError">@color/m3_on_error</item>
+        <!-- Все цвета предоставляются автоматически:
+             baseline Material3 + динамические цвета системы -->
 
-        <!-- Статус-бар прозрачный, чтобы рисовать под ним (edge-to-edge) -->
+        <!-- Edge-to-edge: прозрачные системные бары -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <!-- Сделать статус-бар тёмным/светлым в зависимости от фона -->
-        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Автоматическое определение светлого/тёмного статус-бара
+             в зависимости от текущей темы -->
+        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
     </style>
 </resources>

@@ -22,6 +22,10 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
     private var initialTranslationX = 0f
     private val touchSlop: Int = ViewConfiguration.get(context).scaledTouchSlop
     private var openAnimationEnabled = true
+    private var pendingOpen = false
+
+    // Доля ширины экрана, после которой свайп считается завершённым
+    private val swipeThresholdFraction = 0.25f
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -31,9 +35,19 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         width = w
-        if (!isOpen) {
+        if (pendingOpen) {
+            // Восстанавливаем открытое состояние без анимации
+            settingsView?.translationX = 0f
+            isOpen = true
+            pendingOpen = false
+        } else if (!isOpen) {
             settingsView?.translationX = -width.toFloat()
         }
+    }
+
+    fun requestOpen() {
+        pendingOpen = true
+        requestLayout()
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
@@ -87,12 +101,23 @@ class SwipeToSettingsLayout @JvmOverloads constructor(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 tracking = false
                 val current = settingsView!!.translationX
-                val threshold = -width / 2f
+                val delta = current - initialTranslationX   // на сколько сдвинули от точки захвата
+                val fraction = Math.abs(delta) / width.toFloat()
 
                 if (isOpen) {
-                    if (current < threshold) animateToClosed() else animateToOpen()
+                    // Открыта → пытаемся закрыть свайпом влево (delta < 0)
+                    if (delta < 0 && fraction > swipeThresholdFraction) {
+                        animateToClosed()
+                    } else {
+                        animateToOpen()
+                    }
                 } else {
-                    if (current > threshold) animateToOpen() else animateToClosed()
+                    // Закрыта → пытаемся открыть свайпом вправо (delta > 0)
+                    if (delta > 0 && fraction > swipeThresholdFraction) {
+                        animateToOpen()
+                    } else {
+                        animateToClosed()
+                    }
                 }
                 return true
             }
